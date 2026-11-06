@@ -1,0 +1,23 @@
+# Go
+*.test
+*.out
+*.exe
+/bin/
+/dist/
+coverage.txt
+# Python / uv
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.ipynb_checkpoints/
+# Run outputs
+out/
+# Editors
+.idea/
+.vscode/
+*.swp
+# macOS
+.DS_Store

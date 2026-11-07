@@ -1,7 +1,7 @@
 # G0 gap matrix
 
 Week 1 hands-on overlap check, run 2026-11-06 on one machine (macOS arm64). Evidence is raw JSON
-and logs under `~/scratch/g0/out/` (outside this repo, by instruction). Paths below are relative
+and logs under `~/scratch/g0/out/` (kept outside the repo). Paths below are relative
 to that directory. The toy agent is `~/scratch/g0/agent/agent.py`: plain OpenAI client against
 local Ollama (`qwen3.8:27b`, temperature 0, seed 0), two deterministic tools
 (`get_unit_price`, `convert_usd_to_eur`), hand-written `invoke_agent`/`chat`/`execute_tool`
@@ -68,7 +68,7 @@ scoring) were **not** read.
   tag, matches the PyPI wheel). `AARonSTeneo/agentic-chaos` is a GitHub fork. Registers a pytest
   plugin entry point on install. Its MCP proxy does emit readable fault events (`cs-mcp/`).
 - Week-1 validation text says evidence goes in `docs/g0/evidence/`; this run kept it in
-  `~/scratch/g0/out/` per instruction, so those cells cite out-of-repo paths.
+  `~/scratch/g0/out/` outside the repo, so those cells cite out-of-repo paths.
 
 ## Not run, and why
 

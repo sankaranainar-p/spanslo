@@ -1,0 +1,8 @@
+{
+  "run_id": "r-0001", "experiment_id": "pilot-01", "task_id": "dataqa-07", "task_turns_expected": 8,
+  "framework": "langgraph", "model": "local-qwen", "baseline": true,
+  "faults": [], "episodes": [],
+  "success": true, "task_verified_recovery": null, "turns": 8, "model_calls": 8, "tool_calls": 6,
+  "tokens_total": 12000, "unsafe_actions": 0, "retry_budget_violations": 0, "graceful_error": null,
+  "turn_mismatches": 0, "semconv_version": "e6658f14c9d9ea0760825f029cb82e7673f48fab"
+}

@@ -5,7 +5,12 @@ requires-python = ">=3.12,<3.13"
 dependencies = []
 
 [dependency-groups]
-dev = ["pytest", "ruff"]
+dev = [
+    "jsonschema>=4.26.0",
+    "pytest",
+    "pyyaml>=6.0.3",
+    "ruff",
+]
 
 [tool.ruff]
 line-length = 100

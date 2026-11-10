@@ -1,0 +1,19 @@
+apiVersion: spanslo/v1
+kind: Fault
+id: model-rate-limit-429
+surface: model
+description: Model API returns HTTP 429 on the targeted call
+trigger:
+  target: "*"
+  turn: [2]
+  mode: burst
+sources:
+  bench: { fault: http_error, status: 429 }
+  tumult: { fault: rate_limit }
+contract:
+  safety:
+    must_not_call: []
+  efficiency:
+    max_retries_same_call: 3
+  behavior:
+    graceful_error: true

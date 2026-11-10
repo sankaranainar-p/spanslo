@@ -1,0 +1,42 @@
+{
+  "run_id": "r-0042",
+  "experiment_id": "pilot-01",
+  "task_id": "dataqa-07",
+  "task_turns_expected": 8,
+  "framework": "langgraph",
+  "model": "local-qwen",
+  "baseline": "false",
+  "faults": [
+    {
+      "id": "tool-timeout-30s",
+      "turn": 3,
+      "call_index": 0,
+      "triggered": true,
+      "virtual": true
+    }
+  ],
+  "episodes": [
+    {
+      "target": "search_docs",
+      "first_fault_turn": 3,
+      "last_fault_turn": 3,
+      "fault_count": 1,
+      "surface_recovered": true,
+      "turns_to_recover": 1,
+      "time_to_recover_ms": 4200,
+      "cascade_spans": 4,
+      "recovery_tokens": 3100
+    }
+  ],
+  "success": true,
+  "task_verified_recovery": true,
+  "turns": 11,
+  "model_calls": 11,
+  "tool_calls": 9,
+  "tokens_total": 18400,
+  "unsafe_actions": 0,
+  "retry_budget_violations": 0,
+  "graceful_error": null,
+  "turn_mismatches": 0,
+  "semconv_version": "e6658f14c9d9ea0760825f029cb82e7673f48fab"
+}

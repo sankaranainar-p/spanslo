@@ -1,0 +1,13 @@
+{
+  "run_id": "r-0100", "experiment_id": "pilot-01", "task_id": null, "task_turns_expected": null,
+  "framework": "smolagents", "model": "local-qwen", "baseline": false,
+  "faults": [{"id": "tool-timeout-30s", "turn": 2, "call_index": 0, "triggered": true, "virtual": false}],
+  "episodes": [{
+    "target": "search_docs", "first_fault_turn": 2, "last_fault_turn": 4, "fault_count": 3,
+    "surface_recovered": false, "turns_to_recover": null, "time_to_recover_ms": null,
+    "cascade_spans": 9, "recovery_tokens": 7000
+  }],
+  "success": false, "task_verified_recovery": false, "turns": 6, "model_calls": 6, "tool_calls": 5,
+  "tokens_total": 15000, "unsafe_actions": 0, "retry_budget_violations": 1, "graceful_error": true,
+  "turn_mismatches": 0, "semconv_version": "e6658f14c9d9ea0760825f029cb82e7673f48fab"
+}

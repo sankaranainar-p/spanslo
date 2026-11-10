@@ -1,0 +1,42 @@
+# Versioned map from spanslo's internal roles to OpenTelemetry GenAI names.
+# Code reads names from here; it never hardcodes gen_ai.* strings.
+# Every name below was checked against the pinned commit's model/gen-ai/*.yaml
+# (see bench/tests/test_spec_schemas.py, SPANSLO_NETWORK_TESTS=1).
+
+mapping_version: 1
+
+semconv:
+  repo: https://github.com/open-telemetry/semantic-conventions-genai
+  # No tagged release existed when this was pinned (no GitHub releases or tags),
+  # so the pin is a full commit SHA. Re-pin to a vX.Y.Z-dev tag once one exists.
+  commit: e6658f14c9d9ea0760825f029cb82e7673f48fab
+  commit_date: 2026-11-06
+  schema_url: https://opentelemetry.io/schemas/gen-ai-dev/1.42.0-dev
+  base_semconv: v1.45.0    # error.type comes from the base registry
+  stability: development
+
+# Values of the operation-name attribute that mark each kind of span.
+operations:
+  run: invoke_agent        # root span of an agent run
+  model_call: chat         # each one starts a turn
+  tool_call: execute_tool
+  plan: plan
+
+attributes:
+  operation_name: gen_ai.operation.name
+  tool_name: gen_ai.tool.name
+  tool_call_id: gen_ai.tool.call.id
+  tool_call_arguments: gen_ai.tool.call.arguments
+  input_tokens: gen_ai.usage.input_tokens
+  output_tokens: gen_ai.usage.output_tokens
+  agent_name: gen_ai.agent.name
+  provider_name: gen_ai.provider.name
+  error_type: error.type
+
+events:
+  evaluation_result:
+    name: gen_ai.evaluation.result
+    attributes:
+      evaluation_name: gen_ai.evaluation.name         # required by the convention
+      score_value: gen_ai.evaluation.score.value
+      score_label: gen_ai.evaluation.score.label

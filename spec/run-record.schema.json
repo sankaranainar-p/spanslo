@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "spanslo run record",
+  "description": "One record per agent run, written by the scorer. Source of truth for docs/design.md, section 'Run record (output)'. Nullable fields are null when the quantity is undefined for the run (for example, no fault fired).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id", "experiment_id", "task_id", "task_turns_expected", "framework", "model", "baseline",
+    "faults", "episodes", "success", "task_verified_recovery", "turns", "model_calls",
+    "tool_calls", "tokens_total", "unsafe_actions", "retry_budget_violations", "graceful_error",
+    "turn_mismatches", "semconv_version"
+  ],
+  "properties": {
+    "run_id": { "type": "string", "minLength": 1 },
+    "experiment_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": ["string", "null"], "description": "Null for untagged live traffic." },
+    "task_turns_expected": { "type": ["integer", "null"], "minimum": 1 },
+    "framework": { "type": "string", "minLength": 1 },
+    "model": { "type": "string", "minLength": 1 },
+    "baseline": { "type": "boolean", "description": "True for runs with no fault." },
+    "faults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "turn", "call_index", "triggered", "virtual"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "turn": { "type": "integer", "minimum": 1 },
+          "call_index": { "type": "integer", "minimum": 0 },
+          "triggered": { "type": "boolean" },
+          "virtual": { "type": "boolean", "description": "True when a timeout was simulated." }
+        }
+      }
+    },
+    "episodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target", "first_fault_turn", "last_fault_turn", "fault_count", "surface_recovered",
+          "turns_to_recover", "time_to_recover_ms", "cascade_spans", "recovery_tokens"
+        ],
+        "properties": {
+          "target": { "type": "string", "minLength": 1 },
+          "first_fault_turn": { "type": "integer", "minimum": 1 },
+          "last_fault_turn": { "type": "integer", "minimum": 1 },
+          "fault_count": { "type": "integer", "minimum": 1 },
+          "surface_recovered": { "type": "boolean" },
+          "turns_to_recover": { "type": ["integer", "null"], "minimum": 0, "description": "Null when not recovered." },
+          "time_to_recover_ms": { "type": ["integer", "null"], "minimum": 0, "description": "Null when not recovered." },
+          "cascade_spans": { "type": "integer", "minimum": 0 },
+          "recovery_tokens": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "success": { "type": "boolean", "description": "Oracle verdict." },
+    "task_verified_recovery": {
+      "type": ["boolean", "null"],
+      "description": "Every episode recovered and the oracle passed. Null for baseline runs and runs with no triggered fault."
+    },
+    "turns": { "type": "integer", "minimum": 0 },
+    "model_calls": { "type": "integer", "minimum": 0 },
+    "tool_calls": { "type": "integer", "minimum": 0 },
+    "tokens_total": { "type": "integer", "minimum": 0 },
+    "unsafe_actions": { "type": "integer", "minimum": 0 },
+    "retry_budget_violations": { "type": "integer", "minimum": 0 },
+    "graceful_error": {
+      "type": ["boolean", "null"],
+      "description": "Set only for runs where some episode did not recover; null otherwise."
+    },
+    "turn_mismatches": { "type": "integer", "minimum": 0 },
+    "semconv_version": { "type": "string", "minLength": 1 }
+  }
+}

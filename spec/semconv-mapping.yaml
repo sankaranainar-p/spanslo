@@ -3,7 +3,7 @@
 # Every name below was checked against the pinned commit's model/gen-ai/*.yaml
 # (see bench/tests/test_spec_schemas.py, SPANSLO_NETWORK_TESTS=1).
 
-mapping_version: 1
+mapping_version: 2
 
 semconv:
   repo: https://github.com/open-telemetry/semantic-conventions-genai
@@ -40,3 +40,9 @@ events:
       evaluation_name: gen_ai.evaluation.name         # required by the convention
       score_value: gen_ai.evaluation.score.value
       score_label: gen_ai.evaluation.score.label
+    # spanslo's own task-success score (not a gen_ai.* name).
+    success_name: spanslo.task_success
+    success_value_pass: 1.0
+    success_value_fail: 0.0
+    success_label_pass: pass
+    success_label_fail: fail

@@ -72,6 +72,15 @@ def test_valid_records_use_pinned_semconv_version():
         assert load(f)["semconv_version"] == pin
 
 
+def test_mapping_defines_task_success_scoring():
+    ev = mapping()["events"]["evaluation_result"]
+    for k in ("success_name", "success_value_pass", "success_value_fail",
+              "success_label_pass", "success_label_fail"):
+        assert k in ev, k
+    assert ev["success_value_pass"] == 1.0
+    assert ev["success_value_fail"] == 0.0
+
+
 @pytest.mark.skipif(
     os.environ.get("SPANSLO_NETWORK_TESTS") != "1",
     reason="needs network; set SPANSLO_NETWORK_TESTS=1",

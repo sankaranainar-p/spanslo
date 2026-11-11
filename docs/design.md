@@ -1,6 +1,6 @@
 # spanslo: Architecture and Implementation Plan
 
-Author: Sankaranainar Parmasivan · Design version v2.3 · November 5, 2026
+Author: Sankaranainar Parmasivan · Design version v2.4 · November 11, 2026
 
 ## Summary and decisions
 
@@ -11,6 +11,8 @@ It does not build a general purpose fault injector or a new SLO specification. B
 **Revision v2, November 5, 2026:** updated after review for the rename, fault source design, where normalization runs, SLI definitions, turn based step indexing, sizing, and new overlap with agentic-chaos 0.9.
 
 **Revision v2.1, November 5, 2026:** turn numbers shared through a run state store, fault episodes for multi fault modes, turns to recover as the primary recovery speed metric, safety and efficiency contracts separated, task keyed baselines, single run concurrency on local models, and synced metric names. v2.2, same day: run ID passed to each tool process through its environment, recovery error checks scoped to the episode's target and fallbacks, and graceful error read by the oracle from a structured final answer. v2.3: renamed to spanslo across names, attributes, metrics and CLI; ResiliBench added to the overlap check and risks.
+
+**Revision v2.4** success encoding settled (spanslo.task_success, 1.0 or 0.0), semconv pinned to a commit
 
 **Decisions for you to confirm:**
 
@@ -91,7 +93,7 @@ spanslo reads standard gen\_ai.\* spans, adds a small spanslo.\* namespace only 
 
 ### Inputs from OpenTelemetry GenAI conventions
 
-The conventions are at Development status, so spanslo reads them through a versioned mapping file (spec/semconv-mapping.yaml) rather than hardcoding names. Pin a release of semantic-conventions-genai in week 1 and confirm each name below against it.
+The conventions are at Development status, so spanslo reads them through a versioned mapping file (spec/semconv-mapping.yaml) rather than hardcoding names. Pinned to a commit in week 3, because no release or tag existed (see ADR 0002). Each name below is checked against it.
 
 | Signal | Expected span or attribute | Used for |
 | --- | --- | --- |
@@ -101,7 +103,7 @@ The conventions are at Development status, so spanslo reads them through a versi
 | Planning | plan spans (where emitted) | Step indexing |
 | Tokens | gen\_ai.usage.input\_tokens, gen\_ai.usage.output\_tokens | Token Amplification Factor |
 | Errors | Span status and error.type | Failure detection |
-| Outcome | gen\_ai.evaluation.result event from the harness oracle, carrying task success and spanslo.oracle.graceful\_error | Task success |
+| Outcome | gen\_ai.evaluation.result event from the harness oracle. Name spanslo.task\_success, score.value 1.0 for pass and 0.0 for fail, score.label pass or fail. Also carries spanslo.oracle.graceful\_error | Task success |
 
 ### Run identity (set by the harness)
 

@@ -1,0 +1,9 @@
+slos:
+  - name: recovery_speed
+    sli: turns_to_recover
+    threshold_max: 3
+    objective: 0.95
+windows:
+  count:
+    budget: 1000
+    burn: [{long: 200, short: 20, factor: 6}]

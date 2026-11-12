@@ -1,0 +1,15 @@
+apiVersion: spanslo/v1
+kind: Fault
+id: model-malformed-tool-args
+surface: model
+description: Model returns a tool call whose arguments are not valid JSON
+owasp: [ASI02]
+trigger:
+  target: "*"
+  turn: [1, 3, 5]
+supported_modes: [single]
+sources:
+  bench: { fault: malform_tool_args, kind: invalid_json }
+  chaos-security: { unverified: true }
+  deepagentlabs-chaos: { unverified: true }
+  tumult: { unverified: true }

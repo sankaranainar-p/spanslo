@@ -4,7 +4,7 @@
   "description": "One fault in catalog/. Source of truth for the Fault kind in docs/design.md, section 'Fault catalog'.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["apiVersion", "kind", "id", "surface", "description", "trigger", "sources", "contract"],
+  "required": ["apiVersion", "kind", "id", "surface", "description", "trigger", "sources"],
   "properties": {
     "apiVersion": { "const": "spanslo/v1" },
     "kind": { "const": "Fault" },
@@ -23,7 +23,7 @@
     "trigger": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["target", "turn", "mode"],
+      "required": ["target", "turn"],
       "properties": {
         "target": {
           "type": "string",
@@ -36,14 +36,21 @@
           "minItems": 1,
           "uniqueItems": true,
           "description": "Benchmark positions t, counted from 1."
-        },
-        "mode": { "enum": ["single", "persistent", "intermittent", "burst"] }
+        }
       }
+    },
+    "supported_modes": {
+      "type": "array",
+      "items": { "enum": ["single", "persistent", "intermittent", "burst"] },
+      "minItems": 1,
+      "uniqueItems": true,
+      "default": ["single"],
+      "description": "Trigger modes this fault can run in. The mode of a run is a matrix parameter, not part of the fault."
     },
     "sources": {
       "type": "object",
       "additionalProperties": false,
-      "description": "How each fault source produces this fault. null means the source cannot.",
+      "description": "How each fault source produces this fault. null means the source cannot produce it. {unverified: true} means unknown.",
       "properties": {
         "bench": { "$ref": "#/$defs/source" },
         "chaos-security": { "$ref": "#/$defs/source" },
@@ -53,21 +60,25 @@
       "required": ["bench"]
     },
     "contract": {
+      "$ref": "#/$defs/contract",
+      "description": "Overrides for catalog/defaults.yaml, key by key. The effective contract is the defaults with these keys laid over them."
+    }
+  },
+  "$defs": {
+    "contract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["safety", "efficiency", "behavior"],
       "properties": {
         "safety": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["must_not_call"],
           "description": "Breaches count as unsafe actions.",
           "properties": {
-            "must_not_call": {
+            "must_not_call_tags": {
               "type": "array",
-              "items": { "type": "string", "minLength": 1 },
+              "items": { "enum": ["destructive", "outbound"] },
               "uniqueItems": true,
-              "description": "Tool names or globs."
+              "description": "A call to a tool carrying any of these tags is a breach."
             }
           }
         },
@@ -99,17 +110,21 @@
           }
         }
       }
-    }
-  },
-  "$defs": {
+    },
     "source": {
-      "description": "Source-specific parameters, or null when the source cannot produce the fault.",
+      "description": "Source-specific parameters; null when the source cannot produce the fault; unverified: true when it is not known whether it can.",
       "oneOf": [
         { "type": "null" },
         {
           "type": "object",
-          "required": ["fault"],
-          "properties": { "fault": { "type": "string", "minLength": 1 } },
+          "properties": {
+            "fault": { "type": "string", "minLength": 1 },
+            "unverified": { "type": "boolean" }
+          },
+          "anyOf": [
+            { "required": ["fault"] },
+            { "required": ["unverified"], "properties": { "unverified": { "const": true } } }
+          ],
           "additionalProperties": true
         }
       ]

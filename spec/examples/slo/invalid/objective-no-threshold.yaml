@@ -1,0 +1,8 @@
+slos:
+  - name: cost
+    sli: taf
+    objective: 0.95
+windows:
+  count:
+    budget: 5000
+    burn: [{long: 500, short: 50, factor: 6}]

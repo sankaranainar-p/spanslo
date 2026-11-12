@@ -1,0 +1,8 @@
+slos:
+  - name: resilience
+    sli: resilience_ratio
+    target: 0.9
+windows:
+  time:
+    budget: 30 days
+    burn: [{long: 1h, short: 5m, factor: 14.4}]

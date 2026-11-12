@@ -1,0 +1,4 @@
+slos:
+  - name: resilience
+    sli: resilience_ratio
+    target: 0.9

@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "spanslo SLO file",
+  "description": "slo.yaml. Source of truth for the SLO file in docs/design.md, section 'SLOs and error budgets'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slos", "windows"],
+  "properties": {
+    "slos": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/slo" },
+      "description": "SLO names must be unique; checked by tests, not by this schema."
+    },
+    "windows": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "time": { "$ref": "#/$defs/timeWindow" },
+        "count": { "$ref": "#/$defs/countWindow" }
+      }
+    }
+  },
+  "$defs": {
+    "duration": { "type": "string", "pattern": "^[1-9][0-9]*(s|m|h|d)$" },
+    "factor": { "type": "number", "exclusiveMinimum": 0 },
+    "slo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sli"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "sli": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "An id from spec/sli-definitions.md; its SLO form must match the form used here (checked by tests)."
+        },
+        "target": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Minimum value the SLI must reach. Error budget = 1 - target."
+        },
+        "target_max": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum value a rate SLI may reach. Error budget = target_max."
+        },
+        "threshold_max": {
+          "type": "number",
+          "minimum": 0,
+          "description": "For a distribution SLI: the value each episode or run must not exceed."
+        },
+        "burn": {
+          "type": "boolean",
+          "default": true,
+          "description": "false turns burn windows off for this SLO. Required false when the SLI is not counted as a fraction of runs or episodes (checked by tests)."
+        },
+        "objective": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Fraction of episodes or runs that must meet threshold_max. Error budget = 1 - objective."
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["target"],
+          "properties": { "target_max": false, "threshold_max": false, "objective": false }
+        },
+        {
+          "required": ["target_max"],
+          "properties": { "target": false, "threshold_max": false, "objective": false }
+        },
+        {
+          "required": ["threshold_max", "objective"],
+          "properties": { "target": false, "target_max": false }
+        }
+      ]
+    },
+    "timeWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["budget", "burn"],
+      "properties": {
+        "budget": { "$ref": "#/$defs/duration" },
+        "burn": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["long", "short", "factor"],
+            "properties": {
+              "long": { "$ref": "#/$defs/duration" },
+              "short": { "$ref": "#/$defs/duration" },
+              "factor": { "$ref": "#/$defs/factor" }
+            }
+          }
+        }
+      }
+    },
+    "countWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["budget", "burn"],
+      "properties": {
+        "budget": { "type": "integer", "minimum": 1, "description": "Runs in the budget window." },
+        "burn": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["long", "short", "factor"],
+            "properties": {
+              "long": { "type": "integer", "minimum": 1 },
+              "short": { "type": "integer", "minimum": 1 },
+              "factor": { "$ref": "#/$defs/factor" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

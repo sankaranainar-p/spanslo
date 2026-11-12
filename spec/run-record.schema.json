@@ -5,10 +5,10 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "run_id", "experiment_id", "task_id", "task_turns_expected", "framework", "model", "baseline",
+    "run_id", "experiment_id", "task_id", "task_turns_expected", "framework", "model", "baseline", "mode",
     "faults", "episodes", "success", "task_verified_recovery", "turns", "model_calls",
-    "tool_calls", "tokens_total", "unsafe_actions", "retry_budget_violations", "graceful_error",
-    "turn_mismatches", "semconv_version"
+    "tool_calls", "tokens_total", "unsafe_actions", "untagged_tool_calls", "retry_budget_violations", "graceful_error",
+    "fault_not_applied", "turn_mismatches", "semconv_version"
   ],
   "properties": {
     "run_id": { "type": "string", "minLength": 1 },
@@ -18,6 +18,10 @@
     "framework": { "type": "string", "minLength": 1 },
     "model": { "type": "string", "minLength": 1 },
     "baseline": { "type": "boolean", "description": "True for runs with no fault." },
+    "mode": {
+      "enum": ["none", "single", "burst", "intermittent", "persistent"],
+      "description": "Trigger mode the run was planned with, written by the harness from the experiment plan. 'none' exactly when baseline is true."
+    },
     "faults": {
       "type": "array",
       "items": {
@@ -65,12 +69,33 @@
     "tool_calls": { "type": "integer", "minimum": 0 },
     "tokens_total": { "type": "integer", "minimum": 0 },
     "unsafe_actions": { "type": "integer", "minimum": 0 },
+    "untagged_tool_calls": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Calls to tools lacking the destructiveHint or openWorldHint annotation. Never counted as unsafe actions."
+    },
     "retry_budget_violations": { "type": "integer", "minimum": 0 },
     "graceful_error": {
       "type": ["boolean", "null"],
       "description": "Set only for runs where some episode did not recover; null otherwise."
     },
+    "fault_not_applied": {
+      "type": "boolean",
+      "description": "True when the plan called for a fault but the run has no fault event. Such runs are excluded from scoring. True exactly when baseline is false and faults is empty."
+    },
     "turn_mismatches": { "type": "integer", "minimum": 0 },
     "semconv_version": { "type": "string", "minLength": 1 }
-  }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "baseline": { "const": true } }, "required": ["baseline"] },
+      "then": { "properties": { "mode": { "const": "none" } } },
+      "else": { "properties": { "mode": { "enum": ["single", "burst", "intermittent", "persistent"] } } }
+    },
+    {
+      "if": { "properties": { "baseline": { "const": false }, "faults": { "maxItems": 0 } }, "required": ["baseline", "faults"] },
+      "then": { "properties": { "fault_not_applied": { "const": true } } },
+      "else": { "properties": { "fault_not_applied": { "const": false } } }
+    }
+  ]
 }

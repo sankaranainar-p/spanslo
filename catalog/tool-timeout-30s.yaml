@@ -7,9 +7,9 @@ owasp: [ASI08]
 trigger:
   target: "*"
   turn: [1, 3, 5]
-  mode: single
+supported_modes: [single, burst, persistent]
 sources:
   bench: { fault: timeout, virtual_seconds: 30, real_delay_ms: 500 }
-  chaos-security: { fault: timeout, seconds: 30 }
-  deepagentlabs-chaos: null
+  chaos-security: { fault: timeout, seconds: 30, unverified: true }
+  deepagentlabs-chaos: { unverified: true }
   tumult: null

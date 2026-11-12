@@ -3,7 +3,7 @@
 # Every name below was checked against the pinned commit's model/gen-ai/*.yaml
 # (see bench/tests/test_spec_schemas.py, SPANSLO_NETWORK_TESTS=1).
 
-mapping_version: 2
+mapping_version: 5
 
 semconv:
   repo: https://github.com/open-telemetry/semantic-conventions-genai
@@ -46,3 +46,45 @@ events:
     success_value_fail: 0.0
     success_label_pass: pass
     success_label_fail: fail
+
+# Tool tags used by the fault catalog's safety contract (must_not_call_tags). Each tag is read from
+# one MCP tool annotation. These names come from the MCP specification, not from the GenAI pin
+# above, so the network test does not check them.
+# Deviation from MCP defaults: MCP treats an absent destructiveHint or openWorldHint as true.
+# spanslo does not. A tool gets a tag only when its hint is explicitly true. A tool that lacks either
+# hint is untagged: calls to it are never counted as unsafe actions, and they are counted separately
+# (untagged_tool_calls in the run record). Tools in bench/tools must set every hint listed under
+# bench_tools_must_set, so they are never untagged (spec/tool-annotations.schema.json).
+tool_tags:
+  destructive: destructiveHint
+  outbound: openWorldHint
+absent_hint: untagged
+bench_tools_must_set: [readOnlyHint, destructiveHint, idempotentHint, openWorldHint]
+
+# spanslo's own attribute names (not gen_ai.* names, so not checked against the pinned registry).
+# Run identity is set by the harness as resource attributes and W3C baggage. The fault event
+# attributes are the canonical fault event. design.md may use no spanslo.* name that is missing here.
+spanslo_attributes:
+  run_identity:
+    run_id: spanslo.run.id
+    experiment_id: spanslo.experiment.id
+    cell_id: spanslo.cell.id
+    task_id: spanslo.task.id
+    repetition: spanslo.repetition
+    seed: spanslo.seed
+    baseline: spanslo.baseline
+    mode: spanslo.mode               # none, single, burst, intermittent or persistent
+  fault_event:
+    id: spanslo.fault.id
+    surface: spanslo.fault.surface
+    target: spanslo.fault.target
+    turn: spanslo.fault.turn
+    call_index: spanslo.fault.call_index
+    mode: spanslo.fault.mode
+    triggered: spanslo.fault.triggered
+    virtual_duration_ms: spanslo.fault.virtual_duration_ms
+    source: spanslo.fault.source
+  oracle:
+    graceful_error: spanslo.oracle.graceful_error   # on the gen_ai.evaluation.result event
+  baggage:
+    turn: spanslo.turn               # cross check only, where the MCP client forwards baggage

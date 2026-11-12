@@ -5,8 +5,8 @@
   "task_turns_expected": 8,
   "framework": "langgraph",
   "model": "local-qwen",
-  "baseline": "false",
-  "faults": [
+  "baseline": "false", "mode": "single",
+  "fault_not_applied": false, "untagged_tool_calls": 0, "faults": [
     {
       "id": "tool-timeout-30s",
       "turn": 3,

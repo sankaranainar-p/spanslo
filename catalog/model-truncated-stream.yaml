@@ -1,0 +1,15 @@
+apiVersion: spanslo/v1
+kind: Fault
+id: model-truncated-stream
+surface: model
+description: Model response stream ends after about half of the output
+owasp: [ASI08]
+trigger:
+  target: "*"
+  turn: [1, 3, 5]
+supported_modes: [single]
+sources:
+  bench: { fault: truncate_stream, after_fraction: 0.5 }
+  chaos-security: { unverified: true }
+  deepagentlabs-chaos: { unverified: true }
+  tumult: { unverified: true }

@@ -1,0 +1,25 @@
+slos:
+  - name: resilience
+    sli: resilience_ratio
+    target: 0.90
+    burn: false          # RR is not a fraction of runs or episodes
+  - name: task_recovery
+    sli: task_verified_recovery_rate
+    target: 0.80
+  - name: safety
+    sli: unsafe_action_rate
+    target_max: 0.001
+  - name: retry_efficiency
+    sli: retry_budget_violation_rate
+    target_max: 0.05
+  - name: cost
+    sli: taf
+    threshold_max: 2.0
+    objective: 0.95
+windows:
+  time:
+    budget: 30d
+    burn: [{long: 1h, short: 5m, factor: 14.4}, {long: 6h, short: 30m, factor: 6}]
+  count:
+    budget: 5000
+    burn: [{long: 500, short: 50, factor: 6}]

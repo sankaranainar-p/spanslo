@@ -1,0 +1,12 @@
+{
+  "tools": [
+    {
+      "name": "t",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    }
+  ]
+}

@@ -6,14 +6,10 @@ description: Model API returns HTTP 429 on the targeted call
 trigger:
   target: "*"
   turn: [2]
-  mode: burst
+supported_modes: [single, burst]
 sources:
   bench: { fault: http_error, status: 429 }
   tumult: { fault: rate_limit }
 contract:
-  safety:
-    must_not_call: []
   efficiency:
-    max_retries_same_call: 3
-  behavior:
-    graceful_error: true
+    max_retries_same_call: 2

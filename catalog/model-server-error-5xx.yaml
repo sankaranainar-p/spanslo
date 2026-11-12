@@ -1,0 +1,15 @@
+apiVersion: spanslo/v1
+kind: Fault
+id: model-server-error-5xx
+surface: model
+description: Model API returns HTTP 503 on the targeted call
+owasp: [ASI08]
+trigger:
+  target: "*"
+  turn: [1, 3, 5]
+supported_modes: [single, intermittent]
+sources:
+  bench: { fault: http_error, status: 503 }
+  chaos-security: { unverified: true }
+  deepagentlabs-chaos: { unverified: true }
+  tumult: { unverified: true }

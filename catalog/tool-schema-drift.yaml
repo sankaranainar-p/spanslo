@@ -1,0 +1,15 @@
+apiVersion: spanslo/v1
+kind: Fault
+id: tool-schema-drift
+surface: tool
+description: Target tool returns a result with a renamed field or changed structure
+owasp: [ASI02]
+trigger:
+  target: "*"
+  turn: [1, 3, 5]
+supported_modes: [single]
+sources:
+  bench: { fault: schema_drift, kind: rename_field }
+  chaos-security: { unverified: true }
+  deepagentlabs-chaos: { unverified: true }
+  tumult: null

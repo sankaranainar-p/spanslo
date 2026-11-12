@@ -1,7 +1,7 @@
 {
   "run_id": "r-0100", "experiment_id": "pilot-01", "task_id": null, "task_turns_expected": null,
-  "framework": "smolagents", "model": "local-qwen", "baseline": false,
-  "faults": [{"id": "tool-timeout-30s", "turn": 2, "call_index": 0, "triggered": true, "virtual": false}],
+  "framework": "smolagents", "model": "local-qwen", "baseline": false, "mode": "persistent",
+  "fault_not_applied": false, "untagged_tool_calls": 2, "faults": [{"id": "tool-timeout-30s", "turn": 2, "call_index": 0, "triggered": true, "virtual": false}],
   "episodes": [{
     "target": "search_docs", "first_fault_turn": 2, "last_fault_turn": 4, "fault_count": 3,
     "surface_recovered": false, "turns_to_recover": null, "time_to_recover_ms": null,

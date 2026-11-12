@@ -1,0 +1,12 @@
+slos:
+  - name: resilience
+    sli: resilience_ratio
+    target: 0.85
+    burn: false
+  - name: task_recovery
+    sli: task_verified_recovery_rate
+    target: 0.80
+windows:
+  count:
+    budget: 1000
+    burn: [{long: 200, short: 20, factor: 6}]

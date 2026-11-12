@@ -1,0 +1,10 @@
+apiVersion: spanslo/v1
+kind: Fault
+id: tool-empty-result
+surface: tool
+description: Target tool returns a successful but empty result
+trigger:
+  target: "*"
+  turn: [1]
+sources:
+  bench: { fault: empty_result }

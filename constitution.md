@@ -8,7 +8,7 @@ Fixed rules for every agent on every task in this project. Only the human edits 
 - The boundary between Go and Python is files and the CLI, never linked code. No cgo, no ctypes, no embedded interpreters.
 
 ## Spec
-- `spec/` is the shared contract and is frozen at G1 (tag v0.1.0-spec). Do not edit it. Go types come from the schemas, never hand edited.
+- `spec/` is the shared contract and is frozen at G1 (tag v0.1.1-spec). Do not edit it. Go run record types are hand written with JSON tags that mirror `spec/run-record.schema.json`. A Python test validates every emitted record against the schema. A generator is deferred (ADR 0004).
 - Never hardcode `gen_ai.*` names. Read them from `spec/semconv-mapping.yaml`.
 - If code and `docs/design.md` disagree, stop and ask.
 

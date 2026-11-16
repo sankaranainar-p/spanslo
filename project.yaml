@@ -1,0 +1,38 @@
+# Project settings read by the orchestrator and agents.
+name: spanslo
+
+commands:
+  build: go build ./...
+  test: go vet ./... && go test ./... && (cd bench && uv run pytest && uv run ruff check)
+  smoke: go vet ./...
+  run: ""          # copied from the template; no app to run
+
+has_ui: false      # true: Playwright browser flows. false: scripted smoke test.
+base_url: ""       # only when has_ui is true
+
+models:
+  primary: claude
+  fallback: gemini-3.8-flash    # model name is config, swap it any time
+  fallback_provider: agy
+  fallback_allowed_for:         # bounded work only
+    - tests
+    - docs
+    - small-fixes
+
+limits:
+  review_retry_cap: 3           # developer and reviewer loops before escalating to the human
+  probe_interval_minutes: 20    # how often to probe Claude when no exact reset time is known
+  default_cooldown_minutes: 300 # assumed wait when a rate limit error has no retry time
+  command_timeout_seconds: 900
+
+protected_paths:
+  - spec/*
+  - catalog/*
+  - docs/*
+  - CLAUDE.md
+  - go.mod
+  - go.sum
+  - .githooks/*
+  - LICENSE
+
+verify_allowlist: [go, uv, pytest]

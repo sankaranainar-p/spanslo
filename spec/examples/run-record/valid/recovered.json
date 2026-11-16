@@ -9,5 +9,5 @@
   }],
   "success": true, "task_verified_recovery": true, "turns": 11, "model_calls": 11, "tool_calls": 9,
   "tokens_total": 18400, "unsafe_actions": 0, "retry_budget_violations": 0, "graceful_error": null,
-  "turn_mismatches": 0, "semconv_version": "e6658f14c9d9ea0760825f029cb82e7673f48fab"
+  "turn_mismatches": 0, "ended_at": "2026-11-12T10:31:45Z", "semconv_version": "e6658f14c9d9ea0760825f029cb82e7673f48fab"
 }

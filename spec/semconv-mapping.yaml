@@ -3,7 +3,7 @@
 # Every name below was checked against the pinned commit's model/gen-ai/*.yaml
 # (see bench/tests/test_spec_schemas.py, SPANSLO_NETWORK_TESTS=1).
 
-mapping_version: 5
+mapping_version: 6
 
 semconv:
   repo: https://github.com/open-telemetry/semantic-conventions-genai
@@ -88,3 +88,9 @@ spanslo_attributes:
     graceful_error: spanslo.oracle.graceful_error   # on the gen_ai.evaluation.result event
   baggage:
     turn: spanslo.turn               # cross check only, where the MCP client forwards baggage
+  # Added in mapping_version 6 (docs/adr/0003-spanslo-attributes.md). Proposed names; not in design.md.
+  task:
+    fallback_tools: spanslo.task.fallback_tools   # string array on the root invoke_agent span; absent or empty = no fallback
+  tool:
+    destructive_hint: spanslo.tool.destructive_hint   # boolean on execute_tool spans, carries MCP destructiveHint
+    open_world_hint: spanslo.tool.open_world_hint     # boolean on execute_tool spans, carries MCP openWorldHint

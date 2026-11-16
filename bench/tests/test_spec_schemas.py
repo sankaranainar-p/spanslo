@@ -366,6 +366,66 @@ def test_mapping_defines_task_success_scoring():
     assert ev["success_value_fail"] == 0.0
 
 
+RECORD_SCHEMA = json.loads((SPEC / "run-record.schema.json").read_text())
+VALID_RECORDS = sorted((SPEC / "examples" / "run-record" / "valid").glob("*.json"))
+
+
+@pytest.mark.parametrize("path", VALID_RECORDS, ids=lambda p: p.stem)
+def test_record_without_ended_at_fails(path):
+    rec = load(path)
+    del rec["ended_at"]
+    errors = list(Draft202012Validator(RECORD_SCHEMA).iter_errors(rec))
+    assert [e.validator for e in errors] == ["required"]
+    assert "ended_at" in errors[0].message
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "2026-11-12T10:31:45+01:00",  # not UTC
+        "2026-11-12T10:31:45+00:00",  # offset form, not the trailing Z
+        "2026-11-12T10:31:45",  # no zone
+        "2026-11-12 10:31:45Z",  # space instead of T
+        "2026-13-12T10:31:45Z",  # month 13
+        "2026-11-12T25:00:00Z",  # hour 25
+        "12 November 2026",
+        "",
+        1731407505,  # a number
+    ],
+)
+def test_ended_at_must_be_rfc3339_utc(value):
+    rec = load(VALID_RECORDS[0])
+    rec["ended_at"] = value
+    assert not Draft202012Validator(RECORD_SCHEMA).is_valid(rec)
+
+
+@pytest.mark.parametrize("value", ["2026-11-12T10:31:45Z", "2026-11-12T10:31:45.123456Z"])
+def test_ended_at_accepts_utc_with_optional_fraction(value):
+    rec = load(VALID_RECORDS[0])
+    rec["ended_at"] = value
+    assert Draft202012Validator(RECORD_SCHEMA).is_valid(rec)
+
+
+@pytest.mark.parametrize("path", VALID_RECORDS, ids=lambda p: p.stem)
+def test_valid_examples_have_a_real_utc_ended_at(path):
+    from datetime import datetime, timezone
+
+    value = load(path)["ended_at"]
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    assert parsed.tzinfo == timezone.utc
+
+
+def test_mapping_names_task_fallbacks_and_tool_annotation_attributes():
+    m = mapping()
+    assert m["mapping_version"] >= 6
+    attrs = m["spanslo_attributes"]
+    assert attrs["task"]["fallback_tools"] == "spanslo.task.fallback_tools"
+    assert attrs["tool"]["destructive_hint"] == "spanslo.tool.destructive_hint"
+    assert attrs["tool"]["open_world_hint"] == "spanslo.tool.open_world_hint"
+    # one annotation attribute per tag in tool_tags
+    assert len(attrs["tool"]) == len(m["tool_tags"])
+
+
 @pytest.mark.skipif(
     os.environ.get("SPANSLO_NETWORK_TESTS") != "1",
     reason="needs network; set SPANSLO_NETWORK_TESTS=1",

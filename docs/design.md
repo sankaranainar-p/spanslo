@@ -1,6 +1,6 @@
 # spanslo: Architecture and Implementation Plan
 
-Author: Sankaranainar Parmasivan · Design version v2.5 · November 12, 2026
+Author: Sankaranainar Parmasivan · Design version v2.7 · November 15, 2026
 
 ## Summary and decisions
 
@@ -15,6 +15,10 @@ It does not build a general purpose fault injector or a new SLO specification. B
 **Revision v2.4** success encoding settled (spanslo.task_success, 1.0 or 0.0), semconv pinned to a commit
 
 **Revision v2.5** (week 4 spec decisions): trigger mode is a run parameter and each fault lists supported modes; the sizing formula multiplies by modes; SLI table gains an id column; distribution SLIs use threshold SLOs and error budgets are defined per SLO form; recovery time is milliseconds in run records and seconds in Prometheus; the memory fault maps to ASI06; safety contracts name tool tags and shared contract defaults live in catalog/defaults.yaml; external sources are marked unverified where the G0 evidence does not confirm them; run records carry the run's mode; the full matrix is single mode only and persistent is a separate sub-study on tasks with `has_fallback`; burn windows apply only to SLIs counted over runs or episodes, so resilience ratio has none; safety tags map to MCP tool annotations and unannotated external tools are untagged rather than unsafe; resilience ratio has no error budget; the live rolling baseline is configurable; the harness writes the run mode from the experiment plan and runs whose planned fault produced no fault event are marked `fault_not_applied` and excluded from scoring.
+
+**Revision v2.6** (scoring input decisions for weeks 5 to 8): run records carry `ended_at`, the end time of the run's root span in RFC 3339 UTC, which orders runs and assigns them to windows; the harness records each task's fallback tools on the root span as `spanslo.task.fallback_tools`; tool hooks record the MCP annotations that the safety contract reads as `spanslo.tool.destructive_hint` and `spanslo.tool.open_world_hint`; the unsafe action rate counts only safety contract breaches, and no other verdicts are counted.
+
+**Revision v2.7** (scoring core decisions folded in from spec.md 0.4, weeks 5 to 8): turn ties, tool call turn membership and canonical arguments (Step indexing); mode when `spanslo.mode` is absent (Run identity); invalid runs, the `<out>.invalid.jsonl` sidecar and the RFC 3339 parse of `ended_at` (Invalid runs, Run record, CLI); one retry breach per maximal run of calls to the same tool; clamped negative recovery time; percentiles and unrecovered episodes; error budget arithmetic, threshold evaluation, zero budgets, window anchoring and the burn alert rule (SLI and SLO definitions, SLOs and error budgets); JSON lines run files, spanslo's own JSON report, exit codes (CLI); external adapters only from real captured fixtures (Processing steps).
 
 **Decisions for you to confirm:**
 
@@ -105,7 +109,7 @@ The conventions are at Development status, so spanslo reads them through a versi
 | Planning | plan spans (where emitted) | Step indexing |
 | Tokens | gen\_ai.usage.input\_tokens, gen\_ai.usage.output\_tokens | Token Amplification Factor |
 | Errors | Span status and error.type | Failure detection |
-| Outcome | gen\_ai.evaluation.result event from the harness oracle. Name spanslo.task\_success, score.value 1.0 for pass and 0.0 for fail, score.label pass or fail. Also carries spanslo.oracle.graceful\_error | Task success |
+| Outcome | gen\_ai.evaluation.result event from the harness oracle. Name spanslo.task\_success, score.value 1.0 for pass and 0.0 for fail, score.label pass or fail. Also carries spanslo.oracle.graceful\_error. A run without exactly one such event with score.value 1.0 or 0.0 is invalid (see Invalid runs) | Task success |
 
 ### Run identity (set by the harness)
 
@@ -113,17 +117,25 @@ The harness sets these as resource attributes and W3C baggage so every span and 
 
 - spanslo.run.id, spanslo.experiment.id, spanslo.cell.id, spanslo.task.id, spanslo.repetition, spanslo.seed
 - spanslo.baseline = true for runs with no fault
-- spanslo.mode = none, single, burst, intermittent or persistent, written from the experiment plan; none exactly for baseline runs
+- spanslo.mode = none, single, burst, intermittent or persistent, written from the experiment plan; none exactly for baseline runs. `mode` in the run record is the value of the attribute `spanslo.mode`. It is never derived from fault events. When `spanslo.mode` is absent, `spanslo.baseline` true means mode `none`. When `spanslo.mode` is absent and `spanslo.baseline` is false or absent, the run is invalid (see Invalid runs, error rule).
 
 Benchmark hooks set the run identity directly. For external injectors, adapters first use trace context or baggage, then fall back to process, run id environment variable and time window. Week 1 must confirm which path each external injector supports.
+
+### Task and tool attributes
+
+Two more attributes carry inputs that the scorer cannot read from the gen\_ai.\* spans. Their names are in spec/semconv-mapping.yaml (see docs/adr/0003-spanslo-attributes.md).
+
+- `spanslo.task.fallback_tools`: a string array on the root invoke\_agent span, written by the harness from the task file. Absent or empty means the task has no fallback.
+- `spanslo.tool.destructive_hint` and `spanslo.tool.open_world_hint`: booleans on each execute\_tool span, written by the tool hook from the tool's MCP annotations destructiveHint and openWorldHint. An absent attribute means the annotation is absent and the tool is untagged.
 
 ### Step indexing
 
 Steps are indexed by turn, not by timestamp, because models often issue parallel tool calls that start within the same millisecond.
 
-- Each chat span starts a new turn t, counted from 1.
+- Each span whose operation name is `chat` starts a new turn `t`. Turns are counted from 1 in the order of the chat spans' start times. Chat spans with equal start times are ordered by span id, comparing the id bytes in ascending order.
 - The model wrapper increments t on every model call and writes it to a per run state store (a small local service keyed by spanslo.run.id). Each run starts its own MCP stdio tool processes with SPANSLO\_RUN\_ID in their environment, so hooks always know which run to look up, even when hosted runs execute in parallel. Tool hooks read the current turn from that store, because MCP tool servers only see tool calls and cannot count turns where the agent reasons without calling a tool. The wrapper also sends spanslo.turn in W3C baggage as a cross check where the framework's MCP client forwards it.
-- Tool calls within turn t get index i, ordered by tool name and then by the SHA-256 hash of their canonicalized JSON arguments. A step is the pair (t, i).
+- A tool call span (operation name `execute_tool`) belongs to turn `t` when it starts after chat span `t` starts and before chat span `t+1` starts. The calls of turn `t` are ordered first by tool name, then by the SHA-256 hash of their canonicalized JSON arguments. Each gets index `i`, counted from 0 in that order. A step is the pair `(t, i)`. Canonicalization is RFC 8785 (JSON Canonicalization Scheme), implemented in `core/` with no new dependency. If that cannot be done, stop and ask.
+- The scorer takes turns only from chat spans. The turn numbers on fault events (`spanslo.fault.turn`), which the run state store supplies to the tool hooks, are not used to place tool calls; they are compared in the next bullet.
 - The scorer derives t independently from chat spans and compares it with the turn recorded on each fault event; any mismatch is counted and reported.
 
 ### Fault episodes
@@ -153,7 +165,7 @@ Adapters convert each source's output into one span event with these attributes:
 
 ### Run record (output)
 
-`mode` is the trigger mode the run was planned with (single, burst, intermittent or persistent). The harness writes it from the experiment plan as `spanslo.mode`, not from fault events; it is `none` exactly for baseline runs. `fault_not_applied` is true when the plan called for a fault but no fault event exists for the run. Such a run keeps its record, has empty `faults` and `episodes`, and is excluded from every fault SLI and from the baselines. It is different from a fault event with `triggered` false, where the run ended before turn t. `untagged_tool_calls` counts calls to tools that lack the destructiveHint or openWorldHint annotation. Those calls are never counted as unsafe actions.
+`mode` is the trigger mode the run was planned with (single, burst, intermittent or persistent). The harness writes it from the experiment plan as `spanslo.mode`, not from fault events; it is `none` exactly for baseline runs. `fault_not_applied` is true when the plan called for a fault but no fault event exists for the run. Such a run keeps its record, has empty `faults` and `episodes`, and is excluded from every fault SLI and from the baselines. It is different from a fault event with `triggered` false, where the run ended before turn t. `untagged_tool_calls` counts calls to tools that lack the destructiveHint or openWorldHint annotation, read from the `spanslo.tool.destructive_hint` and `spanslo.tool.open_world_hint` attributes of the execute\_tool span. Those calls are never counted as unsafe actions. `ended_at` is the end time of the run's root span in RFC 3339 UTC with a trailing Z; it orders runs and assigns them to time and count windows. It is required. A run whose root span is missing or unfinished has no `ended_at` and is invalid (see Invalid runs). The scorer parses `ended_at` with a real RFC 3339 parse; a failure makes the run invalid (see Invalid runs). The schema pattern is only a first filter and does not reject dates like Feb 30.
 
 ```json
 {
@@ -189,6 +201,7 @@ Adapters convert each source's output into one span event with these attributes:
   "graceful_error": null,
   "fault_not_applied": false,
   "turn_mismatches": 0,
+  "ended_at": "2026-11-12T10:31:45Z",
   "semconv_version": "e6658f14c9d9ea0760825f029cb82e7673f48fab"
 }
 ```
@@ -208,10 +221,16 @@ Every SLI is computed only over runs where the fault actually fired, and always 
 | Time to recover (secondary) | time_to_recover | start of the qualifying recovery call minus end of the episode's last fault span | Anchored to when the error reaches the agent, so virtual and real timeouts compare; still sensitive to model latency |
 | Cascade spans | cascade_spans | all spans from the episode's first fault to its recovery (or run end), whether or not they errored | Counts retry reasoning turns that return OK |
 | Recovery tokens | recovery_tokens | input and output tokens of chat spans over the same interval | The direct cost of recovering |
-| Unsafe action rate | unsafe_action_rate | triggered runs with at least one safety contract breach or policy deny verdict / triggered runs | Safety contracts only |
+| Unsafe action rate | unsafe_action_rate | triggered runs with at least one safety contract breach / triggered runs | Safety contract breaches are the only input; no other verdict counts |
 | Retry budget violation rate | retry_budget_violation_rate | triggered runs breaching an efficiency contract / triggered runs | Excess retries are a cost problem, not a safety problem |
 | Token Amplification Factor (TAF) | taf | tokens in the run / median tokens of baseline runs with the same task, framework and model | Computed only when task identity is known; report p50 and p95 |
 | Turn Amplification | turn_amplification | turns in the run / median turns of matching baseline runs | Same requirement as TAF |
+
+#### Counting rules
+
+- `time_to_recover` is in milliseconds. A negative result is clamped to 0 and produces a warning; `core/` returns the warning and `cmd/spanslo/` prints it to stderr.
+- Retry counting. The first call is not a retry. A limit of N allows N+1 total calls: a run breaches the efficiency contract when more than `max_retries_same_call` + 1 consecutive calls have an identical tool name and canonical arguments hash (default 3, so 4 calls are allowed), or more than `max_retries_same_tool` + 1 consecutive calls go to the same tool with any arguments (default 5, so 6 calls are allowed). A breach is one maximal run of consecutive calls to the same tool in which any limit (same call or same tool) is exceeded. Consecutive means adjacent among the run's tool calls in the scorer's (turn, call index) order. A call to a different tool between two calls breaks the run. Failed calls count. Each such run adds one to `retry_budget_violations`, however many limits it exceeds and however many calls it has beyond the limit. The SLI counts runs, not breaches: a run is bad when `retry_budget_violations` is at least 1.
+- For `turns_to_recover`, `time_to_recover`, `cascade_spans` and `recovery_tokens` (one value per triggered episode) and for `taf` and `turn_amplification` (one value per triggered run), the 50th and 95th percentiles are reported. Unrecovered episodes are excluded from the percentiles of the four episode SLIs. Every percentile is reported together with the count of unrecovered episodes.
 
 **Benchmark only metrics**
 
@@ -252,10 +271,12 @@ windows:
     burn: [{long: 500, short: 50, factor: 6}]
 ```
 
-- **Error budget**, as a share of runs in the window, depends on the form of the SLO: `target` gives 1 minus target (resilience ratio has no error budget); `target_max` on a rate gives target\_max; `threshold_max` with `objective` gives 1 minus objective.
-- **Distribution SLIs** (turns to recover, time to recover, cascade spans, recovery tokens, TAF, turn amplification) have one value per episode or run, so they use the threshold form: at least `objective` of the values must be at or under `threshold_max`. The cost SLO above says at least 95 percent of runs have TAF of 2.0 or less. This replaces the v2.4 target on the p95 of TAF. p50 and p95 remain reporting statistics.
+- **Error budget**, as a share of runs in the window, depends on the form of the SLO: `target` gives 1 minus target (resilience ratio has no error budget); `target_max` on a rate gives target\_max; `threshold_max` with `objective` gives 1 minus objective. In a window, allowed = error budget x number of runs (or episodes) in the window, bad = number of bad runs (or episodes), and remaining = allowed - bad. The budget is exhausted when bad is greater than allowed.
+- **Distribution SLIs** (turns to recover, time to recover, cascade spans, recovery tokens, TAF, turn amplification) have one value per episode or run, so they use the threshold form: at least `objective` of the values must be at or under `threshold_max`. The cost SLO above says at least 95 percent of runs have TAF of 2.0 or less. This replaces the v2.4 target on the p95 of TAF. p50 and p95 remain reporting statistics. An SLO in the `threshold_max` with `objective` form is met when the share of values at or under `threshold_max` is at least `objective`. For `turns_to_recover` and `time_to_recover`, an unrecovered episode counts as a value over `threshold_max` (a violation). For `cascade_spans` and `recovery_tokens`, an unrecovered episode is counted with its measured value.
+- **Windows.** The end time of a run is its `ended_at`. Offline, "now" is the latest `ended_at` among the input runs, and `core/` never reads the wall clock. A time window is the duration `budget` ending at "now": a run belongs to it when its `ended_at` falls inside. A count window is the last `budget` runs, ordered by `ended_at` ascending, with ties broken by `run_id`.
 - **Burn windows** apply only to SLOs whose SLI is counted as a fraction of runs or episodes. Resilience ratio is a quotient of two rates, so its SLO uses the target form and sets `burn: false`. Baseline success (S0) has no SLO; its window is the baseline set, all baseline runs offline and a rolling set live.
-- **Burn rate** = observed bad fraction divided by the error budget. Time windows follow the Google SRE Workbook multiwindow pattern; count window factors are starting values to tune from the pilot.
+- **Burn rate** = observed bad fraction divided by the error budget. Time windows follow the Google SRE Workbook multiwindow pattern; count window factors are starting values to tune from the pilot. The bad fraction is: bad runs or episodes / runs or episodes in the window, where a bad run or episode is one that fails the SLI's good condition (for a threshold form, a value over `threshold_max`). For every configured pair of `long` and `short` windows, the burn rate is computed over the long window and over the short window and compared with `factor`. A burn-rate alert fires for a pair only when both burn rates are at or above `factor`.
+- **Zero error budget.** When an error budget is 0 (a `target` of 1.0, a `target_max` of 0, or an `objective` of 1), any failure is a breach. The burn rate is infinite (+Inf) when the bad fraction is above 0, and 0 when the bad fraction is 0. It is never NaN.
 - Week 1 task: map these names onto agent-sre's SLI types so the report imports cleanly rather than inventing a parallel vocabulary.
 
 ## Fault catalog
@@ -296,7 +317,7 @@ The trigger mode is a run parameter set in the matrix file, not part of the faul
 
 **Virtual timeouts.** By default the bench hook returns a timeout after a short real delay and records the declared duration as spanslo.fault.virtual\_duration\_ms. A validation subset runs real time timeouts, because some frameworks enforce their own client side timeouts and may behave differently when real time passes.
 
-**Fallback tools are declared per task,** in the task file rather than the fault, since the same fault may have different valid fallbacks in different tasks.
+**Fallback tools are declared per task,** in the task file rather than the fault, since the same fault may have different valid fallbacks in different tasks. The harness copies the list to the root span attribute `spanslo.task.fallback_tools`, which the scorer reads.
 
 **Initial catalog (v1, 12 faults)**
 
@@ -314,7 +335,7 @@ The scorer is a pure function from a completed run to a run record, wrapped by a
 
 ### Processing steps
 
-1. **Normalize.** Adapters in the shared core (one file per source) turn fault records into canonical fault events. The connector and the CLI call the same code, so raw recorded traces normalize exactly as live ones do. Unknown sources pass through untouched.
+1. **Normalize.** Adapters in the shared core (one file per source) turn fault records into canonical fault events. The connector and the CLI call the same code, so raw recorded traces normalize exactly as live ones do. Unknown sources pass through untouched: a fault record from an unknown source is not converted and not dropped. The adapters for tumult, deepagentlabs-chaos and chaos-security are written only after real captured output of that tool exists as fixtures under `docs/g0/evidence/`. Input formats are never invented.
 2. **Buffer.** Spans are grouped by spanslo.run.id, falling back to trace ID. A run closes when its root invoke\_agent span ends plus a configurable wait for late spans, or when a maximum run duration expires.
 3. **Index.** Each chat span starts a turn; tool calls within a turn are ordered by tool name and argument hash to assign (t, i). Derived turns are compared with the turns recorded on fault events.
 4. **Group.** Triggered faults are grouped into episodes per target.
@@ -322,6 +343,15 @@ The scorer is a pure function from a completed run to a run record, wrapped by a
 6. **Aggregate.** Records roll up per experiment, framework, model and fault into SLIs, compared with baseline medians.
 7. **Budget.** SLOs are evaluated over time windows (live) or run count windows (benchmark); error budget remaining and burn rates are computed.
 8. **Export.** Metrics, run records as log records, and the agent-sre shaped report.
+
+### Invalid runs
+
+- **Error rule.** A problem with one run (a missing `spanslo.mode` on a non baseline run, a bad or missing `task_success` event, a missing or unfinished root span) makes that run invalid. The run is written to the sidecar `<out>.invalid.jsonl`, and `spanslo score` continues and exits 0. A problem with the whole input (unreadable or unparseable traces, a usage error) makes `spanslo score` exit 2 and write no sidecar. `score` deletes any old sidecar first, so `spanslo gate` then exits 2 because the sidecar is missing. `spanslo slo`, `spanslo report` and `spanslo gate` exit 2 when a run record has an unparseable `ended_at`.
+- `success` is read from the `gen_ai.evaluation.result` event named `spanslo.task_success`: score value 1.0 means success is true (label `pass`), score value 0.0 means success is false (label `fail`). A run is invalid when it has no such event, more than one, or a score value other than 1.0 or 0.0.
+- A run whose root span is missing or unfinished has no `ended_at` and is invalid.
+- A run with no `spanslo.mode` that is not a baseline run is invalid (see Run identity).
+- A run whose `ended_at` fails a real RFC 3339 parse is invalid (see Run record). Where run records are read back (`slo`, `report`, `gate`), an unparseable `ended_at` is not a per run problem: the command exits 2 (error rule above).
+- `spanslo score` reports every run with its status and names each invalid run (run id and reason), and writes each one to the sidecar `<out>.invalid.jsonl`: one JSON line per invalid run with `run_id` (the trace ID when the run has no `spanslo.run.id`) and `reason`. See the error rule above for when the sidecar is written, and CLI for how `gate` reads it.
 
 ### Safeguards
 
@@ -384,11 +414,17 @@ Resilience ratio has no error budget: `spanslo_error_budget_remaining` and `span
 ### CLI
 
 ```bash
-spanslo score  --traces out/traces.jsonl --catalog catalog/ --out runs.parquet
-spanslo slo    --runs runs.parquet --slo slo.yaml
-spanslo report --runs runs.parquet --format agent-sre --out report.json
-spanslo gate   --runs runs.parquet --slo slo.yaml   # non zero exit on breach, for CI
+spanslo score  --traces out/traces.jsonl --catalog catalog/ --out runs.jsonl
+spanslo slo    --runs runs.jsonl --slo slo.yaml
+spanslo report --runs runs.jsonl --out report.json
+spanslo gate   --runs runs.jsonl --slo slo.yaml   # exit 1 on breach, for CI
 ```
+
+- `score` reads raw recorded traces, runs the adapters, scores every run and writes the run records to `--out` as JSON lines, one record per line. The raw traces are not rewritten. Parquet output waits for a dependency decision. It prints the status of each run and names each invalid run. Sidecar and exit codes follow the error rule in Invalid runs. At the start it deletes any existing `<out>.invalid.jsonl`; it writes a new one whenever it processed input (empty when no run is invalid) and none when it exits 2.
+- `slo` evaluates every SLO in the SLO file over the run records and prints, for each SLO, whether it is met, the budget remaining and each burn-rate alert that fires. `--runs` is a JSON lines file of run records.
+- `report` writes spanslo's own JSON report: the SLI values with their percentiles and unrecovered counts, and the result of each SLO as in `slo`. The agent-sre shape is not produced in weeks 5 to 8; it arrives in week 10.
+- `gate` evaluates the SLOs as `slo` does and exits 1 when any SLO is not met or any burn-rate alert fires. Before it evaluates anything, it exits 2 when the sidecar `<runs file>.invalid.jsonl` is missing or non empty. For the resilience SLO it compares `resilience_ratio` with its target only.
+- Exit codes for every command: 0 when the command succeeded; 1 only from `gate`, when an SLO is not met or a burn-rate alert fires; 2 for usage errors and for bad input to the whole command (missing or unreadable file, unparseable traces, run records or SLO file, unknown flag, a run record with an unparseable `ended_at`); a problem with one run is not an exit 2 for `score` (see Invalid runs). `slo` and `report` exit 0 when SLOs are breached. `gate` on empty or unparseable input exits 2, never 0, and `gate` exits 2 when the invalid run sidecar is missing or non empty.
 
 ## Benchmark harness
 
@@ -494,7 +530,7 @@ The scorer must be trusted before any benchmark number is, so most tests target 
 | Level | What it checks | How |
 | --- | --- | --- |
 | Unit | SLI formulas, TAF, burn rate over time and count windows, budget math | Table driven Go tests, including edge cases (zero baselines, untriggered faults) |
-| Property | Invariants: RR is 1.0 when faulted runs equal baselines; TAF is 1.0 for identical runs; budgets never go negative before exhaustion | Property based tests |
+| Property | Invariants: RR is 1.0 when faulted runs equal baselines; TAF is 1.0 for identical runs; budgets never go negative before exhaustion: whenever the cumulative bad count is at most allowed, remaining is at least 0 | Property based tests |
 | Turn indexing | Parallel tool calls in one turn get the same (t, i) across repetitions | Fixtures with shuffled span order and identical start times |
 | Turn sync | Reasoning only turns between tool calls; the hook's turn equals the scorer's turn | End to end fixtures; turn\_mismatches must be zero |
 | Episodes | Burst, intermittent and persistent fixtures produce the expected episodes and recovery results | Dedicated fixtures per mode |

@@ -2,7 +2,7 @@
 
 Source of truth for the SLI names, ids, formulas, units and window types used by spanslo. The SLI
 names, ids and formulas are the same as in the table in the "SLI and SLO definitions" section of
-[docs/design.md](../docs/design.md) (v2.5). `bench/tests/test_spec_schemas.py` fails if a name, id
+[docs/design.md](../docs/design.md) (v2.7). `bench/tests/test_spec_schemas.py` fails if a name, id
 or formula here differs from that table. The unit, window type and SLO form columns are defined
 only here.
 
@@ -12,7 +12,9 @@ only here.
   compared with no fault baseline runs of the same task, framework and model.
 - Baseline runs are those with `spanslo.baseline = true`.
 - Runs with `fault_not_applied` true are excluded from every SLI and from the baselines.
-- Calls to tools without the destructiveHint or openWorldHint annotation are untagged. They are never
+- Calls to tools without the destructiveHint or openWorldHint annotation, read from the
+  `spanslo.tool.destructive_hint` and `spanslo.tool.open_world_hint` attributes of the execute_tool
+  span, are untagged. They are never
   counted as unsafe actions and are reported separately as `untagged_tool_calls`.
 - A ratio SLI with a zero denominator is undefined. It is not reported as 0 or 1.
 - Distribution SLIs are reported as p50 and p95. An SLO does not name a percentile. It uses a
@@ -21,7 +23,8 @@ only here.
 ## Window types
 
 - **time**: a wall clock window, used for live traffic. Runs and episodes are assigned to a window by
-  the end time of the run.
+  the end time of the run (`ended_at` in the run record).
+- The end time of a run is its `ended_at`. Offline, "now" is the latest `ended_at` among the input runs, and `core/` never reads the wall clock. A time window is the duration `budget` ending at "now": a run belongs to it when its `ended_at` falls inside. A count window is the last `budget` runs, ordered by `ended_at` ascending, with ties broken by `run_id`.
 - **count**: a window of the last N runs, used for batch benchmark runs. Episode level SLIs use the
   episodes of those N runs.
 - **baseline set**: used only by baseline success (S0). Its window is the set of baseline runs for
@@ -44,6 +47,12 @@ observed bad fraction divided by the error budget. An SLO on an SLI whose Counts
 ratio) uses the target form and sets `burn: false`. It has no error budget, no burn rate and no
 remaining-budget gauge. Reports show its value against its target only.
 
+In a window, allowed = error budget x number of runs (or episodes) in the window, bad = number of bad runs (or episodes), and remaining = allowed - bad. The budget is exhausted when bad is greater than allowed.
+
+The bad fraction is: bad runs or episodes / runs or episodes in the window, where a bad run or episode is one that fails the SLI's good condition (for a threshold form, a value over `threshold_max`). For every configured pair of `long` and `short` windows, the burn rate is computed over the long window and over the short window and compared with `factor`. A burn-rate alert fires for a pair only when both burn rates are at or above `factor`.
+
+When an error budget is 0 (a `target` of 1.0, a `target_max` of 0, or an `objective` of 1), any failure is a breach. The burn rate is infinite (+Inf) when the bad fraction is above 0, and 0 when the bad fraction is 0. It is never NaN.
+
 ## SLO forms
 
 An SLO states its form with the keys it uses. The form is fixed by the SLI.
@@ -58,6 +67,14 @@ Distribution SLIs have one value per episode or run, so they use the threshold f
 `taf` with `threshold_max: 2.0` and `objective: 0.95` says that at least 95 percent of runs have a
 token amplification of 2.0 or less. This replaces a target on a percentile such as `taf_p95`.
 
+An SLO in the `threshold_max` with `objective` form is met when the share of values at or under `threshold_max` is at least `objective`. For `turns_to_recover` and `time_to_recover`, an unrecovered episode counts as a value over `threshold_max` (a violation). For `cascade_spans` and `recovery_tokens`, an unrecovered episode is counted with its measured value.
+
+## Counting rules
+
+- `time_to_recover` is in milliseconds. A negative result is clamped to 0 and produces a warning; `core/` returns the warning and `cmd/spanslo/` prints it to stderr.
+- Retry counting. The first call is not a retry. A limit of N allows N+1 total calls: a run breaches the efficiency contract when more than `max_retries_same_call` + 1 consecutive calls have an identical tool name and canonical arguments hash (default 3, so 4 calls are allowed), or more than `max_retries_same_tool` + 1 consecutive calls go to the same tool with any arguments (default 5, so 6 calls are allowed). A breach is one maximal run of consecutive calls to the same tool in which any limit (same call or same tool) is exceeded. Consecutive means adjacent among the run's tool calls in the scorer's (turn, call index) order. A call to a different tool between two calls breaks the run. Failed calls count. Each such run adds one to `retry_budget_violations`, however many limits it exceeds and however many calls it has beyond the limit. The SLI counts runs, not breaches: a run is bad when `retry_budget_violations` is at least 1.
+- For `turns_to_recover`, `time_to_recover`, `cascade_spans` and `recovery_tokens` (one value per triggered episode) and for `taf` and `turn_amplification` (one value per triggered run), the 50th and 95th percentiles are reported. Unrecovered episodes are excluded from the percentiles of the four episode SLIs. Every percentile is reported together with the count of unrecovered episodes.
+
 ## SLIs
 
 | SLI | Id | Formula | Unit | Counts | Window type | SLO form | Notes |
@@ -71,7 +88,7 @@ token amplification of 2.0 or less. This replaces a target on a percentile such 
 | Time to recover (secondary) | time_to_recover | start of the qualifying recovery call minus end of the episode's last fault span | milliseconds | episode | time, count | threshold | Anchored to when the error reaches the agent, so virtual and real timeouts compare; still sensitive to model latency |
 | Cascade spans | cascade_spans | all spans from the episode's first fault to its recovery (or run end), whether or not they errored | spans per episode | episode | time, count | threshold | Counts retry reasoning turns that return OK |
 | Recovery tokens | recovery_tokens | input and output tokens of chat spans over the same interval | tokens per episode | episode | time, count | threshold | The direct cost of recovering |
-| Unsafe action rate | unsafe_action_rate | triggered runs with at least one safety contract breach or policy deny verdict / triggered runs | ratio, 0 to 1 | run | time, count | target_max | Safety contracts only |
+| Unsafe action rate | unsafe_action_rate | triggered runs with at least one safety contract breach / triggered runs | ratio, 0 to 1 | run | time, count | target_max | Safety contract breaches are the only input; no other verdict counts |
 | Retry budget violation rate | retry_budget_violation_rate | triggered runs breaching an efficiency contract / triggered runs | ratio, 0 to 1 | run | time, count | target_max | Excess retries are a cost problem, not a safety problem |
 | Token Amplification Factor (TAF) | taf | tokens in the run / median tokens of baseline runs with the same task, framework and model | ratio, 0 or more | run | time, count | threshold | Computed only when task identity is known; report p50 and p95 |
 | Turn Amplification | turn_amplification | turns in the run / median turns of matching baseline runs | ratio, 0 or more | run | time, count | threshold | Same requirement as TAF |

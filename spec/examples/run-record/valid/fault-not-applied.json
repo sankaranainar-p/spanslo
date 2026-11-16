@@ -21,5 +21,6 @@
   "retry_budget_violations": 0,
   "graceful_error": null,
   "turn_mismatches": 0,
+  "ended_at": "2026-11-12T10:45:03Z",
   "semconv_version": "e6658f14c9d9ea0760825f029cb82e7673f48fab"
 }

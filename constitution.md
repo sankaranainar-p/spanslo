@@ -15,6 +15,7 @@ Fixed rules for every agent on every task in this project. Only the human edits 
 ## Dependencies and license
 - Ask before adding any dependency. Record its name, version and license in `docs/dependencies.md`.
 - The project is Apache 2.0.
+- Approved dependencies are exactly those listed in `docs/dependencies.md`. Go: `go.yaml.in/yaml/v3` v3.0.6 is approved and already in `go.mod` and `go.sum`; code may import it without further approval. No task edits `go.mod` or `go.sum`.
 
 ## Testing
 - Every change ships with a test that proves it. Never weaken or delete a test to make it pass.

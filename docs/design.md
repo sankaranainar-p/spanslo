@@ -1,6 +1,6 @@
 # spanslo: Architecture and Implementation Plan
 
-Author: Sankaranainar Parmasivan · Design version v2.9 · November 17, 2026
+Author: Sankaranainar Parmasivan · Design version v2.10 · November 17, 2026
 
 ## Summary and decisions
 
@@ -23,6 +23,8 @@ It does not build a general purpose fault injector or a new SLO specification. B
 **Revision v2.8** (indexing decisions, week 5): span id tie-break by lowercased hex string; tool call turn membership with an open ended last turn and ties going to the later turn; a tool call before the first chat span makes the run invalid, with no turn 0 (Step indexing).
 
 **Revision v2.9** (indexing decisions, week 5): tool call arguments are parsed or marshaled to JSON, canonicalized and hashed, absent arguments hash as `{}`, unparseable arguments make the run invalid with no raw string fallback (Step indexing); invalid run reasons name the span with the smallest (start time, lowercase span id) (Invalid runs).
+
+**Revision v2.10** (turn mismatch rules, week 5): `turn_mismatches` counts fault events on chat and tool call spans against the turn derived for that span, ignores events outside the index, and counts a missing or non integer `spanslo.fault.turn` as a mismatch (Step indexing).
 
 **Decisions for you to confirm:**
 
@@ -141,7 +143,7 @@ Steps are indexed by turn, not by timestamp, because models often issue parallel
 - A tool call span (operation name `execute_tool`) belongs to turn `t` when `chat_t.start <= call.start < chat_{t+1}.start`. The last turn is open ended. A call that starts at the same instant as chat span `t+1` belongs to turn `t+1`. A call that starts before the first chat span has no turn: the run is invalid under the error rule ("Invalid runs"), with a reason. There is no turn 0. The calls of turn `t` are ordered first by tool name, then by the SHA-256 hash of their canonicalized JSON arguments, then by span id (lowercase hex compared as plain strings). Each gets index `i`, counted from 0 in that order. A step is the pair `(t, i)`. Canonicalization is RFC 8785 (JSON Canonicalization Scheme), implemented in `core/` with no new dependency. If that cannot be done, stop and ask.
 - The arguments of a tool call are the value of `gen_ai.tool.call.arguments`. If it is a string, it is parsed as JSON; if it is a structured value (object or array), it is marshaled to JSON first. The result is canonicalized (RFC 8785) and hashed. Absent arguments hash as the canonical form of `{}`, identical to an explicit `"{}"`. Arguments that are present but cannot be parsed as JSON make the run invalid under the error rule, with a reason naming that span. There is no raw string fallback.
 - The scorer takes turns only from chat spans. The turn numbers on fault events (`spanslo.fault.turn`), which the run state store supplies to the tool hooks, are not used to place tool calls; they are compared in the next bullet.
-- The scorer derives t independently from chat spans and compares it with the turn recorded on each fault event; any mismatch is counted and reported.
+- `turn_mismatches` counts fault events attached to indexed spans, both chat spans and tool call spans. The scorer derives `t` independently from chat spans and compares the event's `spanslo.fault.turn` with the turn it derived for the span the event is attached to (a chat span's own turn `t`); each fault event where they differ adds one to `turn_mismatches`, and mismatches are reported. Fault events on spans outside the index (such as the root span) are not counted. An event whose `spanslo.fault.turn` is missing or not an integer counts as a mismatch.
 
 ### Fault episodes
 

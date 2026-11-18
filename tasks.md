@@ -56,18 +56,18 @@ Allowed models: Claude
 Depends on: T-002, T-004
 Milestone: M5
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-006: Turn mismatch count
 Satisfies: R-007
-Inputs: T-005 indexing, fault events with spanslo.fault.turn
-Outputs: turn_mismatches computed in core/, turns taken from chat spans only
-Done when: a test with one matching and one mismatching fault event gives turn_mismatches 1
+Inputs: T-005 indexing, fault events with spanslo.fault.turn, design.md v2.10 "Step indexing"
+Outputs: turn_mismatches computed in core/ over fault events on chat and tool call spans, turns taken from chat spans only
+Done when: tests show turn_mismatches counts fault events on chat spans and tool call spans against the turn derived for the span the event is attached to (a chat span's own turn t): (a) a chat span event with the matching turn is not counted, (b) a chat span event with a different turn counts 1, (c) an event on a span outside the index, such as the root span, is not counted, (d) an event with no spanslo.fault.turn counts as a mismatch, (e) an event whose spanslo.fault.turn is not an integer counts as a mismatch; a run with one matching and one mismatching fault event gives turn_mismatches 1
 Allowed models: Claude
 Depends on: T-005
 Milestone: M5
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-007: Week 5 fixtures and purity check
 Satisfies: R-008, R-009
@@ -78,7 +78,7 @@ Allowed models: Claude, Gemini Flash
 Depends on: T-006
 Milestone: M5
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-008: Effective contract from catalog
 Satisfies: R-025

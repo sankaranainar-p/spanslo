@@ -12,7 +12,7 @@ Allowed models: Claude
 Depends on: none
 Milestone: M5
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-002: RFC 8785 canonical JSON and argument hash
 Satisfies: R-005
@@ -23,7 +23,7 @@ Allowed models: Claude
 Depends on: none
 Milestone: M5
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-003: OTLP JSON reader
 Satisfies: R-001
@@ -34,7 +34,7 @@ Allowed models: Claude
 Depends on: T-001
 Milestone: M5
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-004: Group spans into runs
 Satisfies: R-003
@@ -45,7 +45,7 @@ Allowed models: Claude
 Depends on: T-003
 Milestone: M5
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-005: Turn and step indexing
 Satisfies: R-004, R-005, R-006

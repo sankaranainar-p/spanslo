@@ -1,6 +1,6 @@
 # spanslo: Architecture and Implementation Plan
 
-Author: Sankaranainar Parmasivan · Design version v2.7 · November 15, 2026
+Author: Sankaranainar Parmasivan · Design version v2.8 · November 17, 2026
 
 ## Summary and decisions
 
@@ -19,6 +19,8 @@ It does not build a general purpose fault injector or a new SLO specification. B
 **Revision v2.6** (scoring input decisions for weeks 5 to 8): run records carry `ended_at`, the end time of the run's root span in RFC 3339 UTC, which orders runs and assigns them to windows; the harness records each task's fallback tools on the root span as `spanslo.task.fallback_tools`; tool hooks record the MCP annotations that the safety contract reads as `spanslo.tool.destructive_hint` and `spanslo.tool.open_world_hint`; the unsafe action rate counts only safety contract breaches, and no other verdicts are counted.
 
 **Revision v2.7** (scoring core decisions folded in from spec.md 0.4, weeks 5 to 8): turn ties, tool call turn membership and canonical arguments (Step indexing); mode when `spanslo.mode` is absent (Run identity); invalid runs, the `<out>.invalid.jsonl` sidecar and the RFC 3339 parse of `ended_at` (Invalid runs, Run record, CLI); one retry breach per maximal run of calls to the same tool; clamped negative recovery time; percentiles and unrecovered episodes; error budget arithmetic, threshold evaluation, zero budgets, window anchoring and the burn alert rule (SLI and SLO definitions, SLOs and error budgets); JSON lines run files, spanslo's own JSON report, exit codes (CLI); external adapters only from real captured fixtures (Processing steps).
+
+**Revision v2.8** (indexing decisions, week 5): span id tie-break by lowercased hex string; tool call turn membership with an open ended last turn and ties going to the later turn; a tool call before the first chat span makes the run invalid, with no turn 0 (Step indexing).
 
 **Decisions for you to confirm:**
 
@@ -132,9 +134,9 @@ Two more attributes carry inputs that the scorer cannot read from the gen\_ai.\*
 
 Steps are indexed by turn, not by timestamp, because models often issue parallel tool calls that start within the same millisecond.
 
-- Each span whose operation name is `chat` starts a new turn `t`. Turns are counted from 1 in the order of the chat spans' start times. Chat spans with equal start times are ordered by span id, comparing the id bytes in ascending order.
+- Each span whose operation name is `chat` starts a new turn `t`. Turns are counted from 1 in the order of the chat spans' start times. Chat spans with equal start times are ordered by span id: lowercase the hex id and compare as plain strings in ascending order (for equal length hex ids this equals decoded byte order).
 - The model wrapper increments t on every model call and writes it to a per run state store (a small local service keyed by spanslo.run.id). Each run starts its own MCP stdio tool processes with SPANSLO\_RUN\_ID in their environment, so hooks always know which run to look up, even when hosted runs execute in parallel. Tool hooks read the current turn from that store, because MCP tool servers only see tool calls and cannot count turns where the agent reasons without calling a tool. The wrapper also sends spanslo.turn in W3C baggage as a cross check where the framework's MCP client forwards it.
-- A tool call span (operation name `execute_tool`) belongs to turn `t` when it starts after chat span `t` starts and before chat span `t+1` starts. The calls of turn `t` are ordered first by tool name, then by the SHA-256 hash of their canonicalized JSON arguments. Each gets index `i`, counted from 0 in that order. A step is the pair `(t, i)`. Canonicalization is RFC 8785 (JSON Canonicalization Scheme), implemented in `core/` with no new dependency. If that cannot be done, stop and ask.
+- A tool call span (operation name `execute_tool`) belongs to turn `t` when `chat_t.start <= call.start < chat_{t+1}.start`. The last turn is open ended. A call that starts at the same instant as chat span `t+1` belongs to turn `t+1`. A call that starts before the first chat span has no turn: the run is invalid under the error rule ("Invalid runs"), with a reason. There is no turn 0. The calls of turn `t` are ordered first by tool name, then by the SHA-256 hash of their canonicalized JSON arguments, then by span id (lowercase hex compared as plain strings). Each gets index `i`, counted from 0 in that order. A step is the pair `(t, i)`. Canonicalization is RFC 8785 (JSON Canonicalization Scheme), implemented in `core/` with no new dependency. If that cannot be done, stop and ask.
 - The scorer takes turns only from chat spans. The turn numbers on fault events (`spanslo.fault.turn`), which the run state store supplies to the tool hooks, are not used to place tool calls; they are compared in the next bullet.
 - The scorer derives t independently from chat spans and compares it with the turn recorded on each fault event; any mismatch is counted and reported.
 

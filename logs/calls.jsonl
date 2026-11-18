@@ -1,1 +1,0 @@
-{"event": "call", "tier": "primary", "model": "claude", "role": "planner", "duration_s": 75.64, "prompt_chars": 43301, "reply_chars": 2999, "cost_usd": 0.3370977, "input_tokens": 10, "output_tokens": 11443, "num_turns": 5, "ts": 1794809877.577291}

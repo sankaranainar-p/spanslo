@@ -21,3 +21,4 @@ out/
 *.swp
 # macOS
 .DS_Store
+logs/

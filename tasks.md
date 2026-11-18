@@ -49,9 +49,9 @@ Status: done
 
 ## T-005: Turn and step indexing
 Satisfies: R-004, R-005, R-006
-Inputs: T-002 ArgsHash, T-004 runs, design.md v2.7 "Step indexing"
-Outputs: core/index.go assigning turn t to chat spans (start time, then span id bytes) and (t, i) to tool calls (tool name, then args hash)
-Done when: a test shows identical (t, i) for shuffled span order and for identical start times, including parallel calls with the same tool and arguments
+Inputs: T-002 ArgsHash, T-004 runs, design.md v2.9 "Step indexing" and "Invalid runs"
+Outputs: core/index.go assigning turn t to chat spans (start time, then lowercase hex span id as a plain string) and (t, i) to tool calls (tool name, then args hash)
+Done when: a test shows identical (t, i) for shuffled span order and for identical start times, including parallel calls with the same tool and arguments; and tests show that (a) a call starting at the same instant as chat t+1 belongs to turn t+1 and the last turn is open ended, (b) a call before the first chat span makes the run invalid with a reason naming the span that has the smallest (start time, lowercase span id), with no turn 0, (c) string and structured arguments with equal JSON canonicalize to the same hash, absent arguments hash like an explicit "{}", and arguments that are present but not valid JSON make the run invalid with a reason naming that span (no raw string fallback)
 Allowed models: Claude
 Depends on: T-002, T-004
 Milestone: M5

@@ -1,11 +1,14 @@
 package core
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -53,9 +56,12 @@ func TestLoadNames(t *testing.T) {
 	}
 }
 
-// R-002: no gen_ai. string literal in non test Go code.
-func TestNoGenAILiterals(t *testing.T) {
-	root := ".."
+// R-002: no gen_ai. string literal, and no literal equal to an operation name or error.type,
+// in non test Go code. core/names.go is exempt from the exact match.
+var bannedLiterals = []string{"error.type", "invoke_agent", "chat", "execute_tool", "plan"}
+
+func literalViolations(root string) ([]string, error) {
+	var out []string
 	fset := token.NewFileSet()
 	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -64,19 +70,68 @@ func TestNoGenAILiterals(t *testing.T) {
 		if d.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
 			return nil
 		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		exempt := filepath.ToSlash(rel) == "core/names.go"
 		f, err := parser.ParseFile(fset, p, nil, 0)
 		if err != nil {
 			return err
 		}
 		ast.Inspect(f, func(n ast.Node) bool {
-			if l, ok := n.(*ast.BasicLit); ok && l.Kind == token.STRING && strings.Contains(l.Value, "gen_ai.") {
-				t.Errorf("%s: gen_ai literal %s", fset.Position(l.Pos()), l.Value)
+			l, ok := n.(*ast.BasicLit)
+			if !ok || l.Kind != token.STRING {
+				return true
+			}
+			v, err := strconv.Unquote(l.Value)
+			if err != nil {
+				v = l.Value
+			}
+			if strings.Contains(v, "gen_ai.") || (!exempt && slices.Contains(bannedLiterals, v)) {
+				out = append(out, fmt.Sprintf("%s: forbidden literal %s", fset.Position(l.Pos()), l.Value))
 			}
 			return true
 		})
 		return nil
 	})
+	return out, err
+}
+
+func TestNoGenAILiterals(t *testing.T) {
+	got, err := literalViolations("..")
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, v := range got {
+		t.Error(v)
+	}
+}
+
+// R-002: the scan fails on a temporary non test file holding each banned literal.
+func TestLiteralScanCatchesBannedLiterals(t *testing.T) {
+	write := func(root, file, lit string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Join(root, "core"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		src := "package x\n\nvar _ = " + strconv.Quote(lit) + "\n"
+		if err := os.WriteFile(filepath.Join(root, "core", file), []byte(src), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, lit := range append([]string{"gen_ai.tool.name"}, bannedLiterals...) {
+		root := t.TempDir()
+		write(root, "other.go", lit)
+		if got, err := literalViolations(root); err != nil || len(got) != 1 {
+			t.Errorf("%s in other.go: got %v, %v, want one violation", lit, got, err)
+		}
+	}
+	for _, lit := range bannedLiterals {
+		root := t.TempDir()
+		write(root, "names.go", lit)
+		if got, err := literalViolations(root); err != nil || len(got) != 0 {
+			t.Errorf("%s in names.go: got %v, %v, want none", lit, got, err)
+		}
 	}
 }

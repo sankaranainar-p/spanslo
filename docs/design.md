@@ -1,6 +1,6 @@
 # spanslo: Architecture and Implementation Plan
 
-Author: Sankaranainar Parmasivan · Design version v2.11 · November 21, 2026
+Author: Sankaranainar Parmasivan · Design version v2.12 · November 22, 2026
 
 ## Summary and decisions
 
@@ -27,6 +27,8 @@ It does not build a general purpose fault injector or a new SLO specification. B
 **Revision v2.10** (turn mismatch rules, week 5): `turn_mismatches` counts fault events on chat and tool call spans against the turn derived for that span, ignores events outside the index, and counts a missing or non integer `spanslo.fault.turn` as a mismatch (Step indexing).
 
 **Revision v2.11** (run record count rules, week 6): `turns` and `model_calls` are the number of chat spans, `tool_calls` is the number of execute\_tool spans including failed calls, `tokens_total` uses the recovery token counting rule over the whole run, and `task_turns_expected` is read from the root span attribute `spanslo.task.turns_expected`, null when absent, not an integer or below 1 (Task and tool attributes, Run record).
+
+**Revision v2.12** (run identity, week 6): `run_id`, `experiment_id` and `task_id` are read from span attributes, the same place the grouping step reads the run id; `framework` and `model` come from the new attributes `spanslo.framework` and `spanslo.model`; a run with a missing or empty `experiment_id`, `framework` or `model` is invalid; `ScoreRun` takes no identity parameter (Run identity, Invalid runs).
 
 **Decisions for you to confirm:**
 
@@ -123,9 +125,11 @@ The conventions are at Development status, so spanslo reads them through a versi
 
 The harness sets these as resource attributes and W3C baggage so every span and fault event can be tied to a run:
 
-- spanslo.run.id, spanslo.experiment.id, spanslo.cell.id, spanslo.task.id, spanslo.repetition, spanslo.seed
+- spanslo.run.id, spanslo.experiment.id, spanslo.cell.id, spanslo.task.id, spanslo.repetition, spanslo.seed, spanslo.framework, spanslo.model
 - spanslo.baseline = true for runs with no fault
 - spanslo.mode = none, single, burst, intermittent or persistent, written from the experiment plan; none exactly for baseline runs. `mode` in the run record is the value of the attribute `spanslo.mode`. It is never derived from fault events. When `spanslo.mode` is absent, `spanslo.baseline` true means mode `none`. When `spanslo.mode` is absent and `spanslo.baseline` is false or absent, the run is invalid (see Invalid runs, error rule).
+
+The scorer reads identity from the attributes of the run's spans, the same place the grouping step reads `spanslo.run.id` (a span's `spanslo.run.id` when it is a non empty string, otherwise the span's trace ID). `run_id` in the run record is that grouping key. `experiment_id` is the value of `spanslo.experiment.id` and `task_id` is the value of `spanslo.task.id`; `task_id` is null when the attribute is absent. `framework` is the value of `spanslo.framework` and `model` is the value of `spanslo.model`, both written by the harness. A value counts as present only when it is a non empty string, as for `spanslo.run.id`. `ScoreRun` takes no identity parameter: all identity comes from the trace.
 
 Benchmark hooks set the run identity directly. For external injectors, adapters first use trace context or baggage, then fall back to process, run id environment variable and time window. Week 1 must confirm which path each external injector supports.
 
@@ -358,11 +362,12 @@ The scorer is a pure function from a completed run to a run record, wrapped by a
 
 ### Invalid runs
 
-- **Error rule.** A problem with one run (a missing `spanslo.mode` on a non baseline run, a bad or missing `task_success` event, a missing or unfinished root span) makes that run invalid. The run is written to the sidecar `<out>.invalid.jsonl`, and `spanslo score` continues and exits 0. A problem with the whole input (unreadable or unparseable traces, a usage error) makes `spanslo score` exit 2 and write no sidecar. `score` deletes any old sidecar first, so `spanslo gate` then exits 2 because the sidecar is missing. `spanslo slo`, `spanslo report` and `spanslo gate` exit 2 when a run record has an unparseable `ended_at`.
+- **Error rule.** A problem with one run (a missing `spanslo.mode` on a non baseline run, a missing or empty `spanslo.experiment.id`, `spanslo.framework` or `spanslo.model`, a bad or missing `task_success` event, a missing or unfinished root span) makes that run invalid. The run is written to the sidecar `<out>.invalid.jsonl`, and `spanslo score` continues and exits 0. A problem with the whole input (unreadable or unparseable traces, a usage error) makes `spanslo score` exit 2 and write no sidecar. `score` deletes any old sidecar first, so `spanslo gate` then exits 2 because the sidecar is missing. `spanslo slo`, `spanslo report` and `spanslo gate` exit 2 when a run record has an unparseable `ended_at`.
 - `success` is read from the `gen_ai.evaluation.result` event named `spanslo.task_success`: score value 1.0 means success is true (label `pass`), score value 0.0 means success is false (label `fail`). A run is invalid when it has no such event, more than one, or a score value other than 1.0 or 0.0.
 - **Deterministic reasons.** When several spans could cause the same invalid run, the reason names the span with the smallest (start time, lowercase span id), the span id compared as in Step indexing.
 - A run whose root span is missing or unfinished has no `ended_at` and is invalid.
 - A run with no `spanslo.mode` that is not a baseline run is invalid (see Run identity).
+- A run whose `experiment_id`, `framework` or `model` is missing or empty is invalid. The reason names the attribute (`spanslo.experiment.id`, `spanslo.framework` or `spanslo.model`). `task_id` may be null and never makes a run invalid (see Run identity).
 - A run whose `ended_at` fails a real RFC 3339 parse is invalid (see Run record). Where run records are read back (`slo`, `report`, `gate`), an unparseable `ended_at` is not a per run problem: the command exits 2 (error rule above).
 - `spanslo score` reports every run with its status and names each invalid run (run id and reason), and writes each one to the sidecar `<out>.invalid.jsonl`: one JSON line per invalid run with `run_id` (the trace ID when the run has no `spanslo.run.id`) and `reason`. See the error rule above for when the sidecar is written, and CLI for how `gate` reads it.
 

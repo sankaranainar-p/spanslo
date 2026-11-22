@@ -111,7 +111,7 @@ Allowed models: Claude
 Depends on: T-005
 Milestone: M6
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-010: Outcome, invalid runs, ended_at
 Satisfies: R-016, R-073
@@ -122,7 +122,7 @@ Allowed models: Claude
 Depends on: T-004
 Milestone: M6
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-011: Recovery detection
 Satisfies: R-012, R-013, R-014
@@ -133,7 +133,7 @@ Allowed models: Claude
 Depends on: T-009
 Milestone: M6
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-012: Episode grouping
 Satisfies: R-010, R-011
@@ -144,7 +144,7 @@ Allowed models: Claude
 Depends on: T-009, T-011
 Milestone: M6
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-013: Episode metrics
 Satisfies: R-017, R-018, R-019, R-020
@@ -155,7 +155,7 @@ Allowed models: Claude
 Depends on: T-012, T-011
 Milestone: M6
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-014: Task verified recovery and graceful error
 Satisfies: R-015, R-026
@@ -166,7 +166,7 @@ Allowed models: Claude
 Depends on: T-010, T-011
 Milestone: M6
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-015: Safety and efficiency contracts
 Satisfies: R-021, R-022, R-023, R-024
@@ -177,13 +177,13 @@ Allowed models: Claude
 Depends on: T-005, T-008
 Milestone: M6
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-016: Assemble the run record
-Satisfies: R-030, R-073
+Satisfies: R-030, R-073, R-074, R-075, R-076, R-077
 Inputs: T-006, T-009 to T-015, spec/run-record.schema.json
 Outputs: ScoreRun in core/ returning a run record, warnings and an invalid reason; semconv_version from semconv.commit in spec/semconv-mapping.yaml; the Go record type is hand written with JSON tags mirroring spec/run-record.schema.json; a Python test (the schema validation task, T-028) catches drift
-Done when: scoring a fixture returns a record with every required field and semconv_version equal to the pinned SHA, and ended_at equal to the end time of the root invoke_agent span as RFC 3339 UTC with Z (a missing or unfinished root span gives an invalid reason, no record)
+Done when: scoring a fixture returns a record with every required field, turns and model_calls equal to the number of chat spans, tool_calls equal to the number of execute_tool spans including failed calls, tokens_total equal to the sum of input and output tokens over the chat spans, task_turns_expected read from spanslo.task.turns_expected on the root span (null when absent, not an integer or below 1), and semconv_version equal to the pinned SHA, and ended_at equal to the end time of the root invoke_agent span as RFC 3339 UTC with Z (a missing or unfinished root span gives an invalid reason, no record)
 Allowed models: Claude
 Depends on: T-006, T-013, T-014, T-015
 Milestone: M6

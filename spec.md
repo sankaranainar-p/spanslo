@@ -1,6 +1,6 @@
 # Spec: spanslo scoring core and CLI (weeks 5 to 8, gate G2)
 
-Status: accepted for weeks 5 to 8. Version: 0.9. Date: 2026-11-17. Written against docs/design.md v2.10.
+Status: accepted for weeks 5 to 8. Version: 0.10. Date: 2026-11-21. Written against docs/design.md v2.11.
 Approver: Sankaranainar Parmasivan. Status changes from draft to approved only when the approver changes this line.
 
 ## Goal
@@ -13,6 +13,7 @@ Collector connector, Prometheus export, Grafana, the Python harness and benchmar
 Each requirement states its rule, formula or threshold in full, so it can be implemented from this file alone. The Source cell names the file and section that the rule comes from. Section names in quotes are headings in docs/design.md unless another file is named. Requirement IDs are stable and are not reused; they are not in strict numeric order within a week. The checks that end each week are in "Done when", at the end of this file.
 
 ## Changelog
+- 0.10 (2026-11-21): written against design.md v2.11. New R-074 to R-077: `turns` and `model_calls` count chat spans; `tool_calls` counts execute_tool spans including failed calls; `tokens_total` uses the R-020 counting rule over the whole run; `task_turns_expected` is read from `spanslo.task.turns_expected` (null when absent, not an integer or below 1). New attribute in `spec/semconv-mapping.yaml` (mapping_version 7), see `docs/adr/0003-spanslo-attributes.md`.
 - 0.9 (2026-11-17): written against design.md v2.10. R-007: `turn_mismatches` counts fault events on chat spans and tool call spans, compared with the turn derived for the span the event is attached to; events outside the index (such as on the root span) are not counted; a missing or non integer `spanslo.fault.turn` counts as a mismatch.
 - 0.8 (2026-11-17): written against design.md v2.9. R-005: tool call arguments are parsed as JSON when a string, marshaled when structured, then canonicalized and hashed; absent arguments hash as `{}`; unparseable arguments make the run invalid under R-016 with a reason naming the span, with no raw string fallback. R-005, R-016: when several spans could cause the same invalid run, the reason names the span with the smallest (start time, lowercase span id).
 - 0.7 (2026-11-17): written against design.md v2.8. R-004: span id ties compare the lowercased hex id as a plain string. R-005: turn membership is `chat_t.start <= call.start < chat_{t+1}.start`, the last turn is open ended, a call at the same instant as chat `t+1` belongs to `t+1`, tool call ties use the same span id rule, and a call before the first chat span makes the run invalid under R-016 (no turn 0).
@@ -64,6 +65,10 @@ Each requirement states its rule, formula or threshold in full, so it can be imp
 | R-030 | `semconv_version` in the run record is the commit SHA pinned under `semconv.commit` in `spec/semconv-mapping.yaml`. | docs/design.md, "Run record (output)" (JSON example); spec/semconv-mapping.yaml |
 | R-031 | Every emitted run record validates against `spec/run-record.schema.json`. | docs/design.md, "Run record (output)"; "Repository layout and tech stack" |
 | R-073 | `ended_at` in the run record is the end time of the run's root `invoke_agent` span, as an RFC 3339 date-time in UTC with a trailing `Z` (for example `2026-11-12T10:31:45Z`, optional fractional seconds). It is required. A run whose root span is missing or unfinished has no `ended_at` and is invalid (R-016). The scorer parses `ended_at` with a real RFC 3339 parse; a failure makes the run invalid (R-016). When `slo`, `report` or `gate` read a run record whose `ended_at` is unparseable, they exit 2 (R-068). The schema pattern is only a first filter and does not reject dates like Feb 30. | docs/design.md v2.7, "Run record (output)" (`ended_at`) and "Invalid runs"; spec/run-record.schema.json (`ended_at`) |
+| R-074 | `turns` and `model_calls` in the run record both equal the number of chat spans (operation name `chat`) in the run, counted by the Step indexing rules (R-004). | docs/design.md v2.11, "Run record (output)" (counts paragraph); "Step indexing" (first bullet) |
+| R-075 | `tool_calls` in the run record equals the number of tool call spans (operation name `execute_tool`) in the run. Failed calls count. | docs/design.md v2.11, "Run record (output)" (counts paragraph) |
+| R-076 | `tokens_total` in the run record is the sum of `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens` over the chat spans of the run. This is the counting rule of `recovery_tokens` (R-020) applied to the whole run instead of an episode interval. | docs/design.md v2.11, "Run record (output)" (counts paragraph); "SLI and SLO definitions", row `recovery_tokens`; spec.md R-020 |
+| R-077 | `task_turns_expected` in the run record is the value of the attribute `spanslo.task.turns_expected` on the run's root `invoke_agent` span, an integer of at least 1. It is null when the attribute is absent, is not an integer, or is below 1. The attribute name is read from `spec/semconv-mapping.yaml`, not hardcoded (R-002). | docs/design.md v2.11, "Task and tool attributes" and "Run record (output)" (counts paragraph); spec/semconv-mapping.yaml, `spanslo_attributes.task`; spec/run-record.schema.json (`task_turns_expected`) |
 
 ### Week 7: aggregation, baselines, SLOs, budgets
 

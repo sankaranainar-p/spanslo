@@ -14,14 +14,17 @@ these from?
 
 ## Decision
 
-Add two groups of `spanslo.*` attributes to `spec/semconv-mapping.yaml`, under `spanslo_attributes`.
+Add groups of `spanslo.*` attributes to `spec/semconv-mapping.yaml`, under `spanslo_attributes`.
 
 - `spanslo.task.fallback_tools`: a string array on the root `invoke_agent` span, written by the
   harness. Absent or empty means the task has no fallback.
 - `spanslo.tool.destructive_hint` and `spanslo.tool.open_world_hint`: booleans on `execute_tool`
   spans, carrying the MCP annotations `destructiveHint` and `openWorldHint`. An absent attribute
   means the tool is untagged.
-- `mapping_version` goes from 5 to 6, as ADR 0002 requires for any change to a name.
+- `spanslo.task.turns_expected`: an integer of at least 1 on the root `invoke_agent` span, written by the
+  harness from the task file. Absent, not an integer, or below 1 means the run record's
+  `task_turns_expected` is null (design v2.11). Added in mapping_version 7.
+- `mapping_version` goes from 5 to 6 for the first group, and from 6 to 7 for `spanslo.task.turns_expected`, as ADR 0002 requires for any change to a name.
 - Run records gain a required field `ended_at` in `spec/run-record.schema.json`: the end time of the
   root `invoke_agent` span, RFC 3339 date-time in UTC with a trailing `Z`. It orders runs and assigns
   them to time and count windows. The scorer derives it from the span, so it adds no attribute. The scorer parses it with a real RFC 3339 parse, because the schema pattern is only a first filter and does not reject dates like Feb 30. A run whose root span is missing or unfinished has no `ended_at` and is invalid, and `slo`, `report` and `gate` exit 2 on a run record with an unparseable `ended_at` (design v2.7, "Invalid runs").

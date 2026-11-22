@@ -3,7 +3,7 @@
 # Every name below was checked against the pinned commit's model/gen-ai/*.yaml
 # (see bench/tests/test_spec_schemas.py, SPANSLO_NETWORK_TESTS=1).
 
-mapping_version: 6
+mapping_version: 7
 
 semconv:
   repo: https://github.com/open-telemetry/semantic-conventions-genai
@@ -91,6 +91,7 @@ spanslo_attributes:
   # Added in mapping_version 6 (docs/adr/0003-spanslo-attributes.md). Proposed names; not in design.md.
   task:
     fallback_tools: spanslo.task.fallback_tools   # string array on the root invoke_agent span; absent or empty = no fallback
+    turns_expected: spanslo.task.turns_expected   # integer >= 1 on the root invoke_agent span; absent, not an integer or below 1 = null (added in mapping_version 7)
   tool:
     destructive_hint: spanslo.tool.destructive_hint   # boolean on execute_tool spans, carries MCP destructiveHint
     open_world_hint: spanslo.tool.open_world_hint     # boolean on execute_tool spans, carries MCP openWorldHint

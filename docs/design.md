@@ -1,6 +1,6 @@
 # spanslo: Architecture and Implementation Plan
 
-Author: Sankaranainar Parmasivan · Design version v2.10 · November 17, 2026
+Author: Sankaranainar Parmasivan · Design version v2.11 · November 21, 2026
 
 ## Summary and decisions
 
@@ -25,6 +25,8 @@ It does not build a general purpose fault injector or a new SLO specification. B
 **Revision v2.9** (indexing decisions, week 5): tool call arguments are parsed or marshaled to JSON, canonicalized and hashed, absent arguments hash as `{}`, unparseable arguments make the run invalid with no raw string fallback (Step indexing); invalid run reasons name the span with the smallest (start time, lowercase span id) (Invalid runs).
 
 **Revision v2.10** (turn mismatch rules, week 5): `turn_mismatches` counts fault events on chat and tool call spans against the turn derived for that span, ignores events outside the index, and counts a missing or non integer `spanslo.fault.turn` as a mismatch (Step indexing).
+
+**Revision v2.11** (run record count rules, week 6): `turns` and `model_calls` are the number of chat spans, `tool_calls` is the number of execute\_tool spans including failed calls, `tokens_total` uses the recovery token counting rule over the whole run, and `task_turns_expected` is read from the root span attribute `spanslo.task.turns_expected`, null when absent, not an integer or below 1 (Task and tool attributes, Run record).
 
 **Decisions for you to confirm:**
 
@@ -129,10 +131,11 @@ Benchmark hooks set the run identity directly. For external injectors, adapters 
 
 ### Task and tool attributes
 
-Two more attributes carry inputs that the scorer cannot read from the gen\_ai.\* spans. Their names are in spec/semconv-mapping.yaml (see docs/adr/0003-spanslo-attributes.md).
+Three more attributes carry inputs that the scorer cannot read from the gen\_ai.\* spans. Their names are in spec/semconv-mapping.yaml (see docs/adr/0003-spanslo-attributes.md).
 
 - `spanslo.task.fallback_tools`: a string array on the root invoke\_agent span, written by the harness from the task file. Absent or empty means the task has no fallback.
 - `spanslo.tool.destructive_hint` and `spanslo.tool.open_world_hint`: booleans on each execute\_tool span, written by the tool hook from the tool's MCP annotations destructiveHint and openWorldHint. An absent attribute means the annotation is absent and the tool is untagged.
+- `spanslo.task.turns_expected`: an integer of at least 1 on the root invoke\_agent span, written by the harness from the task file. It is the number of turns the task is expected to take.
 
 ### Step indexing
 
@@ -173,6 +176,8 @@ Adapters convert each source's output into one span event with these attributes:
 ### Run record (output)
 
 `mode` is the trigger mode the run was planned with (single, burst, intermittent or persistent). The harness writes it from the experiment plan as `spanslo.mode`, not from fault events; it is `none` exactly for baseline runs. `fault_not_applied` is true when the plan called for a fault but no fault event exists for the run. Such a run keeps its record, has empty `faults` and `episodes`, and is excluded from every fault SLI and from the baselines. It is different from a fault event with `triggered` false, where the run ended before turn t. `untagged_tool_calls` counts calls to tools that lack the destructiveHint or openWorldHint annotation, read from the `spanslo.tool.destructive_hint` and `spanslo.tool.open_world_hint` attributes of the execute\_tool span. Those calls are never counted as unsafe actions. `ended_at` is the end time of the run's root span in RFC 3339 UTC with a trailing Z; it orders runs and assigns them to time and count windows. It is required. A run whose root span is missing or unfinished has no `ended_at` and is invalid (see Invalid runs). The scorer parses `ended_at` with a real RFC 3339 parse; a failure makes the run invalid (see Invalid runs). The schema pattern is only a first filter and does not reject dates like Feb 30.
+
+The counts of a run are read from its spans as follows. `turns` and `model_calls` both equal the number of chat spans in the run, counted by the rules in Step indexing. `tool_calls` equals the number of execute\_tool spans in the run; failed calls count. `tokens_total` is the sum of `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens` over the chat spans of the run, the same counting rule as `recovery_tokens` (SLI and SLO definitions) applied to the whole run instead of an episode interval. `task_turns_expected` is the value of the attribute `spanslo.task.turns_expected` on the root invoke\_agent span. It is null when the attribute is absent, is not an integer, or is below 1.
 
 ```json
 {

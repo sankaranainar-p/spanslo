@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use spanslo, please cite it as below."
+title: "spanslo: reliability SLIs, SLOs and error budgets for AI agents from OpenTelemetry traces"
+type: software
+authors:
+  - family-names: Paramasivan
+    given-names: Sankaranainar
+    orcid: "https://orcid.org/0009-0006-1738-3863"
+repository-code: "https://github.com/sankaranainar-p/spanslo"
+license: Apache-2.0
+keywords:
+  - opentelemetry
+  - ai-agents
+  - reliability
+  - slo
+  - benchmark
+# Add version, date-released and doi when v0.2.0 is tagged and archived.

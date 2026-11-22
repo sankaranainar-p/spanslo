@@ -111,7 +111,7 @@ Allowed models: Claude
 Depends on: T-005
 Milestone: M6
 Verify: go test ./core/...
-Status: blocked
+Status: open
 
 ## T-010: Outcome, invalid runs, ended_at
 Satisfies: R-016, R-073

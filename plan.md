@@ -1,6 +1,6 @@
 # Plan: spanslo scoring core and CLI (weeks 5 to 8, gate G2)
 
-Steps are ordered. Each step cites the R-IDs in spec.md (version 0.5, written against docs/design.md v2.7) it satisfies. YAML parser for Go: `go.yaml.in/yaml/v3`. It is needed from week 5 (step 1 reads `spec/semconv-mapping.yaml`). The human adds it by hand, and records its name, version and license in `docs/dependencies.md`, before the first factory run. Do not add it from a factory run. The "Done when" items (R-009, R-032, R-033, R-047, R-055, R-064, R-065) are validation checks, not build work: they appear only on each week's validation line. A week is done only when its validation passes; a failed check repeats the week (docs/design.md, Weekly execution plan).
+Steps are ordered. Each step cites the R-IDs in spec.md (version 0.9, written against docs/design.md v2.10) it satisfies. YAML parser for Go: `go.yaml.in/yaml/v3`. It is needed from week 5 (step 1 reads `spec/semconv-mapping.yaml`). The human adds it by hand, and records its name, version and license in `docs/dependencies.md`, before the first factory run. Do not add it from a factory run. The "Done when" items (R-009, R-032, R-033, R-047, R-055, R-064, R-065) are validation checks, not build work: they appear only on each week's validation line. A week is done only when its validation passes; a failed check repeats the week (docs/design.md, Weekly execution plan).
 
 ## Architecture
 One Go core, two thin wrappers. Layout from docs/design.md, Repository layout:
@@ -22,14 +22,14 @@ catalog/               frozen, read only
 1. Read `spec/semconv-mapping.yaml` once into a names struct, including the `spanslo_attributes` groups `task` and `tool`; every later step reads names from it (R-002).
 2. OTLP JSON reader producing span values (R-001).
 3. Group spans into runs by `spanslo.run.id`, falling back to trace ID (R-003).
-4. Turn indexing: chat spans start turns, ties by span id ascending bytes (R-004). Tool calls belong to the turn whose chat span they start after and before the next one, and get `(t, i)` by tool name then SHA-256 of RFC 8785 canonical args (R-005). RFC 8785 is written in `core/` with no new dependency; if that is blocked, stop and ask.
-5. Turn mismatch comparison against fault event turns (R-006, R-007).
+4. Turn indexing: chat spans start turns, ties by span id as a lowercase hex string compared as plain strings, ascending (R-004). Tool calls belong to turn `t` when `chat_t.start <= call.start < chat_{t+1}.start`; the last turn is open ended, a call at the same instant as chat `t+1` belongs to `t+1`, and a call before the first chat span makes the run invalid (R-005, R-016). They get `(t, i)` by tool name, then SHA-256 of RFC 8785 canonical args, then span id by the same string rule (R-005). RFC 8785 is written in `core/` with no new dependency; if that is blocked, stop and ask.
+5. Turn mismatch count: fault events on chat and tool call spans are compared with the turn derived for their span; events outside the index are not counted; a missing or non integer `spanslo.fault.turn` is a mismatch (R-006, R-007).
 
 Validation: R-009, turn indexing fixtures pass.
 
 ### Week 6: episodes and run scoring (R-010 to R-031, R-073)
 1. Read the catalog and `defaults.yaml`; build the effective contract per fault (R-025).
-2. Fault event handling: triggered false, `fault_not_applied`, mode from `spanslo.mode` with the baseline rule and bad input exit (R-027 to R-029).
+2. Fault event handling: triggered false, `fault_not_applied`, mode from `spanslo.mode` with the baseline rule; a missing mode on a non baseline run makes the run invalid, not an exit 2 (R-027 to R-029).
 3. Group triggered faults into episodes per target (R-010, R-011).
 4. Recovery scoring: surface recovery with fallbacks from `spanslo.task.fallback_tools`, persistent rule, all episodes (R-012 to R-014).
 5. Episode metrics: turns, time with clamp and warning, cascade spans, recovery tokens (R-017 to R-020).
@@ -45,7 +45,7 @@ Validation: R-032 and R-033, mode fixtures pass, recovery levels, excess retries
 3. SLIs: S0, Sf, RR, recovery rates, unsafe and retry rates, with the undefined rule (R-037 to R-043, R-066).
 4. TAF, turn amplification, p50 and p95 with unrecovered counts (R-044 to R-046).
 5. SLO file reader against `spec/slo.schema.json` (R-048).
-6. Error budgets by SLO form, allowed, bad and remaining, threshold evaluation with unrecovered episodes as violations, resilience ratio exception, zero budget (R-049 to R-051, R-054, R-067).
+6. Error budgets by SLO form, allowed, bad and remaining, threshold evaluation with unrecovered episodes as violations for `turns_to_recover` and `time_to_recover` only, resilience ratio exception, zero budget (R-049 to R-051, R-054, R-067).
 7. Time and count windows with the latest `ended_at` as "now" (R-052), burn rates and the both windows alert rule (R-053).
 
 Validation: R-047 and R-055, unit and property tests pass.
@@ -54,7 +54,7 @@ Validation: R-047 and R-055, unit and property tests pass.
 1. Canonical fault event type (R-057).
 2. Bench adapter and unknown source pass through (R-056, R-058).
 3. `spanslo score` writing JSON lines, the `<out>.invalid.jsonl` sidecar (deleted at the start, rewritten whenever input was processed, none on a usage error) and naming invalid runs (R-016, R-060), then `slo` (R-061), `report` with spanslo's own JSON (R-062), `gate`, which exits 2 on a missing or non empty sidecar (R-063).
-4. Exit codes 0, 1 and 2 across all commands (R-068).
+4. Exit codes 0, 1 and 2 across all commands, including exit 2 from `slo`, `report` and `gate` on an unparseable `ended_at` (R-068).
 5. Golden traces for each fault type with hand checked expected records.
 6. Last: run identity matching for external injectors (R-059), then the tumult, deepagentlabs-chaos and chaos-security adapters (R-070 to R-072). These three are blocked until real captured fixtures exist under `docs/g0/evidence/`. Input formats are never invented. If the fixtures are absent, report the task as blocked. R-059 and R-070 to R-072 need fixtures under `docs/g0/evidence/` and may ship after v0.2.0.
 

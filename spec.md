@@ -1,6 +1,6 @@
 # Spec: spanslo scoring core and CLI (weeks 5 to 8, gate G2)
 
-Status: draft. Version: 0.9. Date: 2026-11-17. Written against docs/design.md v2.10.
+Status: accepted for weeks 5 to 8. Version: 0.9. Date: 2026-11-17. Written against docs/design.md v2.10.
 Approver: Sankaranainar Parmasivan. Status changes from draft to approved only when the approver changes this line.
 
 ## Goal

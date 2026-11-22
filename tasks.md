@@ -80,6 +80,17 @@ Milestone: M5
 Verify: go test ./core/...
 Status: done
 
+## T-040: Names scan covers operation and error literals
+Satisfies: R-002
+Inputs: T-001 scan test in core/names_test.go, spec/semconv-mapping.yaml
+Outputs: core/names_test.go scan extended to also reject the string literals error.type, invoke_agent, chat, execute_tool and plan in non test Go files outside core/names.go
+Done when: the scan fails on a temporary non test file containing each of those five literals and passes on the repository
+Allowed models: Claude, Gemini Flash
+Depends on: T-001
+Milestone: M6
+Verify: go test ./core/...
+Status: done
+
 ## T-008: Effective contract from catalog
 Satisfies: R-025
 Inputs: catalog/defaults.yaml, a fault file, spec/fault.schema.json
@@ -89,7 +100,7 @@ Allowed models: Claude
 Depends on: T-001
 Milestone: M6
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-009: Fault events, untriggered, not applied, mode
 Satisfies: R-027, R-028, R-029
@@ -169,10 +180,10 @@ Verify: go test ./core/...
 Status: open
 
 ## T-016: Assemble the run record
-Satisfies: R-030
+Satisfies: R-030, R-073
 Inputs: T-006, T-009 to T-015, spec/run-record.schema.json
 Outputs: ScoreRun in core/ returning a run record, warnings and an invalid reason; semconv_version from semconv.commit in spec/semconv-mapping.yaml; the Go record type is hand written with JSON tags mirroring spec/run-record.schema.json; a Python test (the schema validation task, T-028) catches drift
-Done when: scoring a fixture returns a record with every required field and semconv_version equal to the pinned SHA
+Done when: scoring a fixture returns a record with every required field and semconv_version equal to the pinned SHA, and ended_at equal to the end time of the root invoke_agent span as RFC 3339 UTC with Z (a missing or unfinished root span gives an invalid reason, no record)
 Allowed models: Claude
 Depends on: T-006, T-013, T-014, T-015
 Milestone: M6

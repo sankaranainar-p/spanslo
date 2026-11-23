@@ -39,7 +39,7 @@ verify_allowlist: [go, uv, pytest]
 
 # Repository snapshot sent to the developer. Keeps core/ in view, drops bulky files.
 context:
-  max_chars: 120000
+  max_chars: 150000
   exclude:
     - "*.lock"
     - "go.sum"
@@ -50,3 +50,12 @@ context:
     - "docs/g0/*"
     - "docs/adr/*"
     - "testdata/*"
+    - "spec/examples/*"
+    - "docs/design.md"
+    - "tasks.md"
+    - "plan.md"
+    - "spec.md"
+    - "README.md"
+    - "CHANGELOG.md"
+    - "CONTRIBUTING.md"
+    - "SECURITY.md"

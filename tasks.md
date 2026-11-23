@@ -199,7 +199,7 @@ Allowed models: Claude, Gemini Flash
 Depends on: T-016
 Milestone: M6
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-018: Aggregation and baselines
 Satisfies: R-034, R-035, R-036

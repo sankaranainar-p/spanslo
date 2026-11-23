@@ -188,7 +188,7 @@ Allowed models: Claude
 Depends on: T-006, T-013, T-014, T-015
 Milestone: M6
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-017: Week 6 validation fixtures
 Satisfies: R-032, R-033

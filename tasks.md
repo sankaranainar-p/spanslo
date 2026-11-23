@@ -180,10 +180,10 @@ Verify: go test ./core/...
 Status: done
 
 ## T-016: Assemble the run record
-Satisfies: R-030, R-073, R-074, R-075, R-076, R-077
+Satisfies: R-030, R-073, R-074, R-075, R-076, R-077, R-078, R-079, R-080, R-081
 Inputs: T-006, T-009 to T-015, spec/run-record.schema.json
 Outputs: ScoreRun in core/ returning a run record, warnings and an invalid reason; semconv_version from semconv.commit in spec/semconv-mapping.yaml; the Go record type is hand written with JSON tags mirroring spec/run-record.schema.json; a Python test (the schema validation task, T-028) catches drift
-Done when: scoring a fixture returns a record with every required field, turns and model_calls equal to the number of chat spans, tool_calls equal to the number of execute_tool spans including failed calls, tokens_total equal to the sum of input and output tokens over the chat spans, task_turns_expected read from spanslo.task.turns_expected on the root span (null when absent, not an integer or below 1), and semconv_version equal to the pinned SHA, and ended_at equal to the end time of the root invoke_agent span as RFC 3339 UTC with Z (a missing or unfinished root span gives an invalid reason, no record)
+Done when: scoring a fixture returns a record with every required field, turns and model_calls equal to the number of chat spans, tool_calls equal to the number of execute_tool spans including failed calls, tokens_total equal to the sum of input and output tokens over the chat spans, task_turns_expected read from spanslo.task.turns_expected on the root span (null when absent, not an integer or below 1), run_id, experiment_id, task_id (null when absent), framework and model read from the trace attributes with no identity parameter on ScoreRun, a run with a missing or empty experiment_id, framework or model returning an invalid reason that names the attribute, and semconv_version equal to the pinned SHA, and ended_at equal to the end time of the root invoke_agent span as RFC 3339 UTC with Z (a missing or unfinished root span gives an invalid reason, no record)
 Allowed models: Claude
 Depends on: T-006, T-013, T-014, T-015
 Milestone: M6

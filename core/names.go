@@ -10,9 +10,13 @@ type Names struct {
 	Events     struct {
 		EvaluationResult EvaluationResult `yaml:"evaluation_result"`
 	} `yaml:"events"`
+	Semconv struct {
+		Commit string `yaml:"commit"`
+	} `yaml:"semconv"`
 	Spanslo struct {
-		Task TaskNames `yaml:"task"`
-		Tool ToolNames `yaml:"tool"`
+		RunIdentity RunIdentityNames `yaml:"run_identity"`
+		Task        TaskNames        `yaml:"task"`
+		Tool        ToolNames        `yaml:"tool"`
 	} `yaml:"spanslo_attributes"`
 }
 
@@ -55,6 +59,16 @@ type EvaluationResult struct {
 // TaskNames are spanslo attributes on the root span.
 type TaskNames struct {
 	FallbackTools string `yaml:"fallback_tools"`
+	TurnsExpected string `yaml:"turns_expected"`
+}
+
+// RunIdentityNames are the run identity attributes written by the harness (R-078, R-079).
+type RunIdentityNames struct {
+	RunID        string `yaml:"run_id"`
+	ExperimentID string `yaml:"experiment_id"`
+	TaskID       string `yaml:"task_id"`
+	Framework    string `yaml:"framework"`
+	Model        string `yaml:"model"`
 }
 
 // ToolNames are spanslo attributes on execute_tool spans.

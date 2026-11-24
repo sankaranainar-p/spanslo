@@ -196,3 +196,56 @@ func TestScoreRunBaseline(t *testing.T) {
 		t.Errorf("got %+v", *r)
 	}
 }
+
+// R-011, R-007: fault turns come from the chat derived turn of the span carrying the event.
+func TestScoreRunFaultTurnsDerived(t *testing.T) {
+	n := idxNames(t)
+	spans := []Span{scoreRoot(n), tokChat(n, "c1", 0, 1, 1), tokChat(n, "c2", 1000, 1, 1),
+		faultOn(recCall(n, "f", "search", 1100, true), "search", 1), recCall(n, "ok", "search", 1200, false)}
+	r, _ := mustScore(t, n, spans)
+	e := r.Episodes
+	if len(e) != 1 || e[0].FirstFaultTurn != 2 || e[0].LastFaultTurn != 2 ||
+		len(r.Faults) != 1 || r.Faults[0].Turn != 2 || r.TurnMismatches != 1 {
+		t.Errorf("got episodes %+v, faults %+v, mismatches %d", e, r.Faults, r.TurnMismatches)
+	}
+}
+
+// R-011: a triggered fault on the root span makes the run invalid, naming the span.
+func TestScoreRunTriggeredFaultOutsideIndex(t *testing.T) {
+	n := idxNames(t)
+	spans := scoreFixture(n)
+	spans[0].Events = append(spans[0].Events, faultEvent(true, 1))
+	r, _, inv := ScoreRun(n, defaultContract, spans)
+	if r != nil || inv == nil || !strings.Contains(inv.Reason, "span r:") {
+		t.Errorf("got %+v, %v, want invalid run naming span r", r, inv)
+	}
+}
+
+// R-011: an untriggered fault takes its turn from spanslo.fault.turn; a bad value is invalid.
+func TestScoreRunUntriggeredFaultTurn(t *testing.T) {
+	n := idxNames(t)
+	try := func(mod func(map[string]any)) (*RunRecord, *InvalidRun) {
+		ev := faultEvent(false, 3)
+		mod(ev.Attrs)
+		spans := scoreFixture(n)
+		spans[0].Events = append(spans[0].Events, ev)
+		r, _, inv := ScoreRun(n, defaultContract, spans)
+		return r, inv
+	}
+	r, inv := try(func(map[string]any) {})
+	if inv != nil || len(r.Faults) != 1 || r.Faults[0].Turn != 3 || r.Faults[0].Triggered || len(r.Episodes) != 0 {
+		t.Fatalf("got %+v, %v, want turn 3 from the attribute", r, inv)
+	}
+	for name, mod := range map[string]func(map[string]any){
+		"missing":  func(a map[string]any) { delete(a, FaultTurnAttr) },
+		"string":   func(a map[string]any) { a[FaultTurnAttr] = "2" },
+		"float":    func(a map[string]any) { a[FaultTurnAttr] = 2.0 },
+		"zero":     func(a map[string]any) { a[FaultTurnAttr] = int64(0) },
+		"negative": func(a map[string]any) { a[FaultTurnAttr] = int64(-1) },
+	} {
+		r, inv := try(mod)
+		if r != nil || inv == nil || !strings.Contains(inv.Reason, FaultTurnAttr) {
+			t.Errorf("%s: got %+v, %v, want invalid run naming %s", name, r, inv, FaultTurnAttr)
+		}
+	}
+}

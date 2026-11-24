@@ -110,6 +110,9 @@ func ScoreRun(n *Names, c *Contract, spans []Span) (*RunRecord, []string, *Inval
 	if err != nil {
 		return nil, nil, asInvalid(err)
 	}
+	if err := DeriveFaultTurns(idx, info); err != nil {
+		return nil, nil, asInvalid(err)
+	}
 	sorted := slices.Clone(spans)
 	slices.SortStableFunc(sorted, spanCmp)
 	id := n.Spanslo.RunIdentity

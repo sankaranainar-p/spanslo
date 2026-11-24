@@ -96,3 +96,26 @@ func ExtractFaults(spans []Span) (*FaultInfo, error) {
 	f.FaultNotApplied = !f.Baseline && len(f.Faults) == 0
 	return f, nil
 }
+
+// DeriveFaultTurns replaces each fault's Turn with the turn the scorer derived for the span
+// carrying it, never the event's own spanslo.fault.turn, which TurnMismatches only compares
+// (R-011). A triggered fault on a span outside the index (such as the root) is an invalid run.
+// So is an untriggered fault, which no span carries, whose spanslo.fault.turn is not an integer
+// of at least 1. Faults are in (start, span id) order, so the first failure names the smallest span.
+func DeriveFaultTurns(idx *RunIndex, f *FaultInfo) error {
+	for i := range f.Faults {
+		e := &f.Faults[i]
+		if !e.Triggered {
+			if e.Turn < 1 {
+				return &InvalidRun{fmt.Sprintf("span %s: %s must be an integer of at least 1", e.SpanID, FaultTurnAttr)}
+			}
+			continue
+		}
+		t, ok := spanTurn(idx, Span{SpanID: e.SpanID})
+		if !ok {
+			return &InvalidRun{fmt.Sprintf("span %s: triggered fault is on a span outside the index", e.SpanID)}
+		}
+		e.Turn = int64(t)
+	}
+	return nil
+}

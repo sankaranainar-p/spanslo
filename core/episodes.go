@@ -11,7 +11,7 @@ type Episode struct {
 // GroupEpisodes groups triggered faults into episodes per target, in order of first fault
 // per target (R-010). Untriggered faults are skipped: they never start or join an episode
 // (R-028). A fault starts a new episode when a qualifying recovery (R-012, R-013) lies
-// between the previous fault of that target and it; the recovery logic is FindRecovery's.
+// between the previous fault of that target and it; the recovery logic is FindRecoveryFor's.
 // faults must be in time order, as TriggeredFaults returns them.
 func GroupEpisodes(idx *RunIndex, spans []Span, faults []FaultEvent, fallbacks []string, persistent bool) []Episode {
 	byID := make(map[string]Span, len(spans))
@@ -33,7 +33,7 @@ func GroupEpisodes(idx *RunIndex, spans []Span, faults []FaultEvent, fallbacks [
 	for _, target := range order {
 		var prev FaultEvent
 		for i, f := range byTarget[target] {
-			if i == 0 || recoveredBetween(idx, byID[prev.SpanID], byID[f.SpanID], target, fallbacks, persistent) {
+			if i == 0 || recoveredBetween(idx, byID[prev.SpanID], byID[f.SpanID], prev.Surface, target, fallbacks, persistent) {
 				out = append(out, Episode{Target: target, FirstFaultTurn: f.Turn})
 			}
 			e := &out[len(out)-1]
@@ -45,15 +45,9 @@ func GroupEpisodes(idx *RunIndex, spans []Span, faults []FaultEvent, fallbacks [
 	return out
 }
 
-// recoveredBetween reports whether FindRecovery finds a qualifying recovery for fault span a
-// among the calls that start before fault span b. Cutting the calls at b keeps b's own error
+// recoveredBetween reports whether FindRecoveryFor finds a qualifying recovery for fault span a
+// among the spans that start before fault span b. Cutting the spans at b keeps b's own error
 // from cancelling the recovery; "no later error" (R-012) is judged inside that window only.
-func recoveredBetween(idx *RunIndex, a, b Span, target string, fallbacks []string, persistent bool) bool {
-	win := &RunIndex{Chats: idx.Chats}
-	for _, c := range idx.Calls {
-		if c.Span.SpanID != b.SpanID && c.Span.Start.Before(b.Start) {
-			win.Calls = append(win.Calls, c)
-		}
-	}
-	return FindRecovery(win, a, target, fallbacks, persistent) != nil
+func recoveredBetween(idx *RunIndex, a, b Span, surface, target string, fallbacks []string, persistent bool) bool {
+	return FindRecoveryFor(cutBefore(idx, b), a, surface, target, fallbacks, persistent) != nil
 }

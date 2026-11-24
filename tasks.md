@@ -201,6 +201,50 @@ Milestone: M6
 Verify: go test ./core/...
 Status: done
 
+## T-041: Fault turns derived from chat spans
+Satisfies: R-011
+Inputs: core/score.go, core/faults.go, R-004, R-005
+Outputs: episode first_fault_turn, last_fault_turn and faults[].turn taken from the derived turn of the span carrying the fault event
+Done when: a fixture whose spanslo.fault.turn disagrees with the derived turn gives the derived value in first_fault_turn, last_fault_turn and faults[].turn, and turn_mismatches counts the disagreement; a triggered fault on the root span makes the run invalid with a reason naming the span; an untriggered fault takes its turn from spanslo.fault.turn, and a missing, non integer or below 1 value makes the run invalid with a reason naming spanslo.fault.turn
+Allowed models: Claude
+Depends on: T-016
+Milestone: M7
+Verify: go test ./core/...
+Status: done
+
+## T-042: Model surface recovery
+Satisfies: R-012
+Inputs: core/recovery.go, catalog surface field, T-011
+Outputs: the recovery search used by GroupEpisodes and ScoreRun dispatches on the fault surface, with no second entry point left unused: for a model surface fault the qualifying call is the next chat span after the fault turn with no error status and no later chat span with an error status; persistent rule as for tools. The fault turn comes from the derived turn of the span carrying the fault event (spanTurn), whether that span is a chat span or a tool call span; the tool based search is used only when the surface is not model
+Done when: tests show a model surface episode recovering through a later successful chat span, not recovering when a later chat span has an error status, and not recovering under persistent mode without a declared fallback; a model surface fault attached to a tool call span behaves the same; two model faults on one chat span group into one episode; turns_to_recover for a model episode is asserted; one ScoreRun test shows a model surface episode recovered end to end
+Allowed models: Claude
+Depends on: T-041
+Milestone: M7
+Verify: go test ./core/...
+Status: open
+
+## T-043: GroupRuns names and mode validation
+Satisfies: R-029, R-078
+Inputs: core/runs.go, core/faults.go, core/names.go
+Outputs: GroupRuns reads the run id attribute name from Names; ScoreRun rejects a present spanslo.mode outside none, single, burst, intermittent, persistent and none on a non baseline run or not none on a baseline run
+Done when: the names scan test finds no hardcoded run id attribute name in core/runs.go, and invalid-run tests cover an unknown mode, none on a faulted run and single on a baseline run, each with a reason naming spanslo.mode
+Allowed models: Claude
+Depends on: T-042
+Milestone: M7
+Verify: go test ./core/...
+Status: open
+
+## T-044: Week 6 fixtures through ScoreRun
+Satisfies: R-032, R-033
+Inputs: T-017 fixtures, week6_validation_test.go, T-041 to T-043
+Outputs: the T-017 fixtures run through ScoreRun and the evaluate helper that re-implements scoreEpisodes is deleted
+Done when: the unrelated tool run, the four mode fixtures and the excess retries fixture assert on the record returned by ScoreRun, and no test helper calls scoreEpisodes directly
+Allowed models: Claude
+Depends on: T-043
+Milestone: M7
+Verify: go test ./core/...
+Status: open
+
 ## T-018: Aggregation and baselines
 Satisfies: R-034, R-035, R-036
 Inputs: run records, design.md "Safeguards"

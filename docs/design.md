@@ -1,6 +1,6 @@
 # spanslo: Architecture and Implementation Plan
 
-Author: Sankaranainar Parmasivan · Design version v2.12 · November 22, 2026
+Author: Sankaranainar Parmasivan · Design version v2.14 · November 23, 2026
 
 ## Summary and decisions
 
@@ -29,6 +29,10 @@ It does not build a general purpose fault injector or a new SLO specification. B
 **Revision v2.11** (run record count rules, week 6): `turns` and `model_calls` are the number of chat spans, `tool_calls` is the number of execute\_tool spans including failed calls, `tokens_total` uses the recovery token counting rule over the whole run, and `task_turns_expected` is read from the root span attribute `spanslo.task.turns_expected`, null when absent, not an integer or below 1 (Task and tool attributes, Run record).
 
 **Revision v2.12** (run identity, week 6): `run_id`, `experiment_id` and `task_id` are read from span attributes, the same place the grouping step reads the run id; `framework` and `model` come from the new attributes `spanslo.framework` and `spanslo.model`; a run with a missing or empty `experiment_id`, `framework` or `model` is invalid; `ScoreRun` takes no identity parameter (Run identity, Invalid runs).
+
+**Revision v2.13** (decisions from the week 6 gap report): `first_fault_turn`, `last_fault_turn` and `faults[].turn` are derived from chat spans by the Step indexing rules, never copied from `spanslo.fault.turn` (Step indexing); for a fault whose surface is `model`, a qualifying recovery is the next chat span after the fault turn that has no error status and is followed by no chat span with an error status, and the persistent rule applies as for tools (Fault episodes); a present `spanslo.mode` must be one of `none`, `single`, `burst`, `intermittent` or `persistent`, and `none` exactly for baseline runs, otherwise the run is invalid (Run identity, Invalid runs); the grouping step reads the run id attribute name from `spec/semconv-mapping.yaml` (Run identity); the week 6 validation fixtures go through `ScoreRun` (Testing and validation).
+
+**Revision v2.14** (faults with no derived turn): a triggered fault on a span outside the index makes the run invalid, naming the span; the turn of an untriggered fault is the integer value of `spanslo.fault.turn`, which must be an integer of at least 1, otherwise the run is invalid, naming `spanslo.fault.turn` (Step indexing, Invalid runs).
 
 **Decisions for you to confirm:**
 
@@ -127,9 +131,9 @@ The harness sets these as resource attributes and W3C baggage so every span and 
 
 - spanslo.run.id, spanslo.experiment.id, spanslo.cell.id, spanslo.task.id, spanslo.repetition, spanslo.seed, spanslo.framework, spanslo.model
 - spanslo.baseline = true for runs with no fault
-- spanslo.mode = none, single, burst, intermittent or persistent, written from the experiment plan; none exactly for baseline runs. `mode` in the run record is the value of the attribute `spanslo.mode`. It is never derived from fault events. When `spanslo.mode` is absent, `spanslo.baseline` true means mode `none`. When `spanslo.mode` is absent and `spanslo.baseline` is false or absent, the run is invalid (see Invalid runs, error rule).
+- spanslo.mode = none, single, burst, intermittent or persistent, written from the experiment plan; none exactly for baseline runs. `mode` in the run record is the value of the attribute `spanslo.mode`. It is never derived from fault events. When `spanslo.mode` is absent, `spanslo.baseline` true means mode `none`. When `spanslo.mode` is absent and `spanslo.baseline` is false or absent, the run is invalid (see Invalid runs, error rule). A present `spanslo.mode` that is not one of those five values is invalid, and so is a present `none` on a run that is not a baseline run or a present value other than `none` on a baseline run.
 
-The scorer reads identity from the attributes of the run's spans, the same place the grouping step reads `spanslo.run.id` (a span's `spanslo.run.id` when it is a non empty string, otherwise the span's trace ID). `run_id` in the run record is that grouping key. `experiment_id` is the value of `spanslo.experiment.id` and `task_id` is the value of `spanslo.task.id`; `task_id` is null when the attribute is absent. `framework` is the value of `spanslo.framework` and `model` is the value of `spanslo.model`, both written by the harness. A value counts as present only when it is a non empty string, as for `spanslo.run.id`. `ScoreRun` takes no identity parameter: all identity comes from the trace.
+The scorer reads identity from the attributes of the run's spans, the same place the grouping step reads `spanslo.run.id` (the attribute name is read from `spec/semconv-mapping.yaml`, never hardcoded; a span's `spanslo.run.id` when it is a non empty string, otherwise the span's trace ID). `run_id` in the run record is that grouping key. `experiment_id` is the value of `spanslo.experiment.id` and `task_id` is the value of `spanslo.task.id`; `task_id` is null when the attribute is absent. `framework` is the value of `spanslo.framework` and `model` is the value of `spanslo.model`, both written by the harness. A value counts as present only when it is a non empty string, as for `spanslo.run.id`. `ScoreRun` takes no identity parameter: all identity comes from the trace.
 
 Benchmark hooks set the run identity directly. For external injectors, adapters first use trace context or baggage, then fall back to process, run id environment variable and time window. Week 1 must confirm which path each external injector supports.
 
@@ -151,6 +155,7 @@ Steps are indexed by turn, not by timestamp, because models often issue parallel
 - The arguments of a tool call are the value of `gen_ai.tool.call.arguments`. If it is a string, it is parsed as JSON; if it is a structured value (object or array), it is marshaled to JSON first. The result is canonicalized (RFC 8785) and hashed. Absent arguments hash as the canonical form of `{}`, identical to an explicit `"{}"`. Arguments that are present but cannot be parsed as JSON make the run invalid under the error rule, with a reason naming that span. There is no raw string fallback.
 - The scorer takes turns only from chat spans. The turn numbers on fault events (`spanslo.fault.turn`), which the run state store supplies to the tool hooks, are not used to place tool calls; they are compared in the next bullet.
 - `turn_mismatches` counts fault events attached to indexed spans, both chat spans and tool call spans. The scorer derives `t` independently from chat spans and compares the event's `spanslo.fault.turn` with the turn it derived for the span the event is attached to (a chat span's own turn `t`); each fault event where they differ adds one to `turn_mismatches`, and mismatches are reported. Fault events on spans outside the index (such as the root span) are not counted. An event whose `spanslo.fault.turn` is missing or not an integer counts as a mismatch.
+- The turn of a fault is derived by these rules and never copied from `spanslo.fault.turn`: for an event on a chat span it is that span's turn `t`, for an event on a tool call span it is the turn of that call, and `first_fault_turn`, `last_fault_turn` and `faults[].turn` in the run record use it. `spanslo.fault.turn` is only compared in `turn_mismatches`, except for an untriggered fault. A triggered fault attached to a span outside the index (for example the root span) makes the run invalid under the error rule, and the reason names the span. For an untriggered fault, which no span carries, the turn is the integer value of `spanslo.fault.turn`, which must be an integer of at least 1; otherwise the run is invalid and the reason names `spanslo.fault.turn`.
 
 ### Fault episodes
 
@@ -159,6 +164,7 @@ Burst, intermittent and persistent modes fire more than one fault per run, so re
 - An episode is a sequence of triggered faults on the same target with no qualifying recovery between them. A new fault after a recovery starts a new episode.
 - Each episode records its first and last fault, fault count, whether it recovered, turns and time to recover, cascade spans and recovery tokens.
 - Under persistent mode the target never recovers, so only a declared fallback can end the episode with recovery.
+- For a fault whose surface is `model` (see the catalog), the target is the model call. A qualifying recovery is the next chat span after the fault turn that has no error status and is followed by no chat span with an error status. The persistent rule applies as for tools: under persistent mode no later chat span on the target qualifies, so a model surface episode can only recover through a declared fallback tool call.
 - A run counts as surface recovered only if all of its episodes recovered.
 
 ### Canonical fault event
@@ -367,6 +373,8 @@ The scorer is a pure function from a completed run to a run record, wrapped by a
 - **Deterministic reasons.** When several spans could cause the same invalid run, the reason names the span with the smallest (start time, lowercase span id), the span id compared as in Step indexing.
 - A run whose root span is missing or unfinished has no `ended_at` and is invalid.
 - A run with no `spanslo.mode` that is not a baseline run is invalid (see Run identity).
+- A run with a triggered fault on a span outside the index, or an untriggered fault whose `spanslo.fault.turn` is not an integer of at least 1, is invalid (see Step indexing). The reason names the span or `spanslo.fault.turn`.
+- A run whose present `spanslo.mode` is not one of `none`, `single`, `burst`, `intermittent` or `persistent`, or is `none` on a non baseline run, or is not `none` on a baseline run, is invalid. The reason names `spanslo.mode`.
 - A run whose `experiment_id`, `framework` or `model` is missing or empty is invalid. The reason names the attribute (`spanslo.experiment.id`, `spanslo.framework` or `spanslo.model`). `task_id` may be null and never makes a run invalid (see Run identity).
 - A run whose `ended_at` fails a real RFC 3339 parse is invalid (see Run record). Where run records are read back (`slo`, `report`, `gate`), an unparseable `ended_at` is not a per run problem: the command exits 2 (error rule above).
 - `spanslo score` reports every run with its status and names each invalid run (run id and reason), and writes each one to the sidecar `<out>.invalid.jsonl`: one JSON line per invalid run with `run_id` (the trace ID when the run has no `spanslo.run.id`) and `reason`. See the error rule above for when the sidecar is written, and CLI for how `gate` reads it.
@@ -554,7 +562,7 @@ The scorer must be trusted before any benchmark number is, so most tests target 
 | Episodes | Burst, intermittent and persistent fixtures produce the expected episodes and recovery results | Dedicated fixtures per mode |
 | Contract classes | Excess retries raise retry budget violations and never unsafe actions; forbidden calls raise unsafe actions | Dedicated fixtures |
 | Golden traces | Full scoring of recorded traces against hand checked expected records | Fixtures in testdata/traces, one per fault type |
-| Recovery levels | A run that calls an unrelated tool after a fault, then answers wrongly, scores no surface or task recovery | Dedicated fixtures |
+| Recovery levels | A run that calls an unrelated tool after a fault, then answers wrongly, scores no surface or task recovery | Dedicated fixtures, scored through `ScoreRun` |
 | Adapter contracts | Each external source's real output converts to the canonical fault event | Record real Tumult and agentic-chaos runs once; replay in CI |
 | Live versus offline | Connector and CLI produce identical records for the same raw traces | Run both on the same fixtures and diff |
 | Virtual versus real timeouts | Turns to recover and success match within tolerance between simulated and real timeouts | The validation subset in the benchmark |

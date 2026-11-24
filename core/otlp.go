@@ -95,6 +95,9 @@ type wireSpan struct {
 
 type wireRequest struct {
 	ResourceSpans []struct {
+		Resource struct {
+			Attrs []wireAttr `json:"attributes"`
+		} `json:"resource"`
 		ScopeSpans []struct {
 			Spans []wireSpan `json:"spans"`
 		} `json:"scopeSpans"`
@@ -213,11 +216,21 @@ func ParseOTLP(data []byte) ([]Span, error) {
 		}
 		n++
 		for _, rs := range req.ResourceSpans {
+			res, err := attrMap(rs.Resource.Attrs)
+			if err != nil {
+				return nil, fmt.Errorf("otlp: resource attributes: %w", err)
+			}
 			for _, ss := range rs.ScopeSpans {
 				for _, w := range ss.Spans {
 					s, err := w.span()
 					if err != nil {
 						return nil, fmt.Errorf("otlp: span %q: %w", w.Name, err)
+					}
+					// resource attributes fill in what the span lacks; the span's own value wins (R-001, R-078)
+					for k, v := range res {
+						if _, ok := s.Attrs[k]; !ok {
+							s.Attrs[k] = v
+						}
 					}
 					spans = append(spans, s)
 				}

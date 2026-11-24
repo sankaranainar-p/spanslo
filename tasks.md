@@ -221,7 +221,7 @@ Allowed models: Claude
 Depends on: T-041
 Milestone: M7
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-043: GroupRuns names and mode validation
 Satisfies: R-029, R-078
@@ -232,7 +232,7 @@ Allowed models: Claude
 Depends on: T-042
 Milestone: M7
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-044: Week 6 fixtures through ScoreRun
 Satisfies: R-032, R-033
@@ -243,7 +243,7 @@ Allowed models: Claude
 Depends on: T-043
 Milestone: M7
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-018: Aggregation and baselines
 Satisfies: R-034, R-035, R-036
@@ -254,7 +254,7 @@ Allowed models: Claude
 Depends on: T-016
 Milestone: M7
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-019: Ratio SLIs and the undefined rule
 Satisfies: R-037, R-038, R-039, R-040, R-041, R-042, R-043, R-066
@@ -265,7 +265,7 @@ Allowed models: Claude
 Depends on: T-018
 Milestone: M7
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-020: TAF and turn amplification
 Satisfies: R-044, R-045, R-066
@@ -276,7 +276,7 @@ Allowed models: Claude
 Depends on: T-018
 Milestone: M7
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-021: Percentiles with unrecovered counts
 Satisfies: R-046
@@ -287,7 +287,7 @@ Allowed models: Claude
 Depends on: T-019, T-020
 Milestone: M7
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-022: SLO file reader
 Satisfies: R-048
@@ -298,7 +298,7 @@ Allowed models: Claude
 Depends on: T-001
 Milestone: M7
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-023: Error budgets and SLO evaluation
 Satisfies: R-049, R-050, R-051, R-054, R-067

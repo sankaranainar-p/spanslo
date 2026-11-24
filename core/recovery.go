@@ -71,14 +71,30 @@ func AllRecovered(episodes []bool) bool {
 
 // FindRecoveryFor is the recovery search of an episode; it dispatches on the fault surface
 // (R-012). For a model surface fault the qualifying call is the next chat span after the
-// fault turn with no error status and no later chat span with an error status. The fault
-// turn is the derived turn of the span carrying the fault, a chat span or a tool call span.
-// Under persistent mode no chat span qualifies (R-013), so only a declared fallback tool
-// can recover, as for tools. Every other surface uses the tool search, FindRecovery.
+// fault turn with no error status and no later chat span with an error status, or the
+// successful call to a declared fallback tool that qualifies under FindRecovery, whichever
+// starts first. The fault turn is the derived turn of the span carrying the fault, a chat
+// span or a tool call span. Under persistent mode no chat span qualifies (R-013), so only a
+// declared fallback tool can recover, as for tools. Every other surface uses the tool
+// search, FindRecovery.
 func FindRecoveryFor(idx *RunIndex, fault Span, surface, target string, fallbacks []string, persistent bool) *Call {
-	if surface != "model" || persistent {
+	if surface != "model" {
 		return FindRecovery(idx, fault, target, fallbacks, persistent)
 	}
+	// persistent is set here so a call to the model target never qualifies, only a fallback (R-012)
+	fb := FindRecovery(idx, fault, target, fallbacks, true)
+	if persistent {
+		return fb
+	}
+	if ch := nextChatRecovery(idx, fault, target); ch != nil && (fb == nil || spanCmp(ch.Span, fb.Span) <= 0) {
+		return ch
+	}
+	return fb
+}
+
+// nextChatRecovery is the next chat span after the fault turn with no error status and no
+// later chat span with an error status, or nil.
+func nextChatRecovery(idx *RunIndex, fault Span, target string) *Call {
 	t, ok := spanTurn(idx, fault)
 	if !ok || t >= len(idx.Chats) {
 		return nil

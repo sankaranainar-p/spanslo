@@ -344,13 +344,46 @@ Milestone: M8
 Verify: go test ./core/...
 Status: open
 
-## T-027: spanslo score command
-Satisfies: R-060, R-016, R-018
-Inputs: T-016, T-026
-Outputs: cmd/spanslo score: reads traces, runs adapters, writes JSON lines, deletes the old sidecar first, writes <out>.invalid.jsonl (run_id, reason), prints each run status and names invalid runs, prints core warnings to stderr; exits 0 with invalid runs, 2 with no sidecar on unreadable input or usage error
-Done when: tests show a mixed input exits 0 with a sidecar naming the invalid run, a stale sidecar is replaced, and unparseable input exits 2 and leaves no sidecar
+## T-045: Resource attributes onto spans
+Satisfies: R-001, R-078
+Inputs: core/otlp.go, core/runs.go, core/score.go, design.md v2.15 "Run identity"
+Outputs: ParseOTLP copies each resource's attributes onto every span of that resource; a span's own attribute wins on a name clash
+Done when: a fixture that writes spanslo.run.id, spanslo.experiment.id, spanslo.framework and spanslo.model only as resource attributes groups into one run and ScoreRun reads all four; a span attribute with the same name as a resource attribute keeps the span's value; a span in a resource with no attributes is unchanged
 Allowed models: Claude
-Depends on: T-016, T-026
+Depends on: T-044
+Milestone: M8
+Verify: go test ./core/...
+Status: open
+
+## T-046: Fallback recovery for model surface faults
+Satisfies: R-012
+Inputs: core/recovery.go, T-042, design.md v2.15 "Fault episodes"
+Outputs: for a model surface fault in any mode, a successful call to a declared fallback tool after the fault also qualifies as recovery, in addition to the next successful chat span; the persistent rule keeps excluding later chat spans on the target
+Done when: tests show a non persistent model surface episode recovering through a successful fallback tool call with no later successful chat span, not recovering when the fallback call has an error status or a later fallback call errors, and a persistent model surface episode still recovering only through the fallback; a task with no declared fallback behaves as before
+Allowed models: Claude
+Depends on: T-045
+Milestone: M8
+Verify: go test ./core/...
+Status: open
+
+## T-047: Baselines from the whole dataset before windows
+Satisfies: R-036, R-052
+Inputs: core/budget.go, core/windows.go, core/aggregate.go, T-018, T-024, design.md v2.15 "SLI and SLO definitions"
+Outputs: baselines for taf, turn_amplification, resilience ratio and the other baseline keyed SLIs are built from every baseline run in the input dataset before any window trims runs, keyed per run by task, framework and model; the window selects only the runs whose SLI is pooled
+Done when: a test where a count window drops the older baseline runs gives the same TAF and resilience ratio as the same runs with no window; a run is compared with the baseline of its own task, framework and model, not a pooled one; a run with no matching baseline is undefined under the existing rule
+Allowed models: Claude
+Depends on: T-046
+Milestone: M8
+Verify: go test ./core/...
+Status: open
+
+## T-027: spanslo score command
+Satisfies: R-060, R-016, R-018, R-025
+Inputs: T-016, T-026, T-045, design.md v2.15 (contract for a run: the default contract for a baseline run, the effective contract of the fault id for a faulted run; a run whose faults carry more than one distinct fault id is invalid)
+Outputs: cmd/spanslo score: reads traces, runs adapters, writes JSON lines, deletes the old sidecar first, writes <out>.invalid.jsonl (run_id, reason), prints each run status and names invalid runs, prints core warnings to stderr; exits 0 with invalid runs, 2 with no sidecar on unreadable input or usage error
+Done when: tests show a mixed input exits 0 with a sidecar naming the invalid run, a stale sidecar is replaced, and unparseable input exits 2 and leaves no sidecar; a baseline run is scored with the default contract, a faulted run with the effective contract of its fault id, and a run whose faults carry two distinct spanslo.fault.id values is invalid with a reason naming spanslo.fault.id
+Allowed models: Claude
+Depends on: T-016, T-026, T-045
 Milestone: M8
 Verify: go test ./cmd/...
 Status: open

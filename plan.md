@@ -1,6 +1,6 @@
 # Plan: spanslo scoring core and CLI (weeks 5 to 8, gate G2)
 
-Steps are ordered. Each step cites the R-IDs in spec.md (version 0.12, written against docs/design.md v2.13) it satisfies. YAML parser for Go: `go.yaml.in/yaml/v3`. It is needed from week 5 (step 1 reads `spec/semconv-mapping.yaml`). The human adds it by hand, and records its name, version and license in `docs/dependencies.md`, before the first factory run. Do not add it from a factory run. The "Done when" items (R-009, R-032, R-033, R-047, R-055, R-064, R-065) are validation checks, not build work: they appear only on each week's validation line. A week is done only when its validation passes; a failed check repeats the week (docs/design.md, Weekly execution plan).
+Steps are ordered. Each step cites the R-IDs in spec.md (version 0.14, written against docs/design.md v2.15) it satisfies. YAML parser for Go: `go.yaml.in/yaml/v3`. It is needed from week 5 (step 1 reads `spec/semconv-mapping.yaml`). The human adds it by hand, and records its name, version and license in `docs/dependencies.md`, before the first factory run. Do not add it from a factory run. The "Done when" items (R-009, R-032, R-033, R-047, R-055, R-064, R-065) are validation checks, not build work: they appear only on each week's validation line. A week is done only when its validation passes; a failed check repeats the week (docs/design.md, Weekly execution plan).
 
 ## Architecture
 One Go core, two thin wrappers. Layout from docs/design.md, Repository layout:

@@ -1,6 +1,6 @@
 # spanslo: Architecture and Implementation Plan
 
-Author: Sankaranainar Parmasivan · Design version v2.14 · November 23, 2026
+Author: Sankaranainar Parmasivan · Design version v2.15 · November 24, 2026
 
 ## Summary and decisions
 
@@ -33,6 +33,8 @@ It does not build a general purpose fault injector or a new SLO specification. B
 **Revision v2.13** (decisions from the week 6 gap report): `first_fault_turn`, `last_fault_turn` and `faults[].turn` are derived from chat spans by the Step indexing rules, never copied from `spanslo.fault.turn` (Step indexing); for a fault whose surface is `model`, a qualifying recovery is the next chat span after the fault turn that has no error status and is followed by no chat span with an error status, and the persistent rule applies as for tools (Fault episodes); a present `spanslo.mode` must be one of `none`, `single`, `burst`, `intermittent` or `persistent`, and `none` exactly for baseline runs, otherwise the run is invalid (Run identity, Invalid runs); the grouping step reads the run id attribute name from `spec/semconv-mapping.yaml` (Run identity); the week 6 validation fixtures go through `ScoreRun` (Testing and validation).
 
 **Revision v2.14** (faults with no derived turn): a triggered fault on a span outside the index makes the run invalid, naming the span; the turn of an untriggered fault is the integer value of `spanslo.fault.turn`, which must be an integer of at least 1, otherwise the run is invalid, naming `spanslo.fault.turn` (Step indexing, Invalid runs).
+
+**Revision v2.15** (decisions from the week 7 gap report): resource attributes are copied onto every span of their resource when traces are parsed, and a span's own attribute wins on a name clash (Run identity); for a model surface fault in any mode, a successful call to a declared fallback tool also qualifies as recovery, in addition to the next successful chat span (Fault episodes); baselines for TAF, resilience ratio and the other baseline keyed SLIs are built from every baseline run in the input dataset before any window trims runs, and the window selects only the runs whose SLI is pooled (SLI and SLO definitions, Safeguards); the contract for a run is the default contract for a baseline run and the effective contract of the fault id for a faulted run, and a run whose faults carry more than one distinct fault id is invalid, naming `spanslo.fault.id` (Fault catalog, Invalid runs).
 
 **Decisions for you to confirm:**
 
@@ -133,7 +135,7 @@ The harness sets these as resource attributes and W3C baggage so every span and 
 - spanslo.baseline = true for runs with no fault
 - spanslo.mode = none, single, burst, intermittent or persistent, written from the experiment plan; none exactly for baseline runs. `mode` in the run record is the value of the attribute `spanslo.mode`. It is never derived from fault events. When `spanslo.mode` is absent, `spanslo.baseline` true means mode `none`. When `spanslo.mode` is absent and `spanslo.baseline` is false or absent, the run is invalid (see Invalid runs, error rule). A present `spanslo.mode` that is not one of those five values is invalid, and so is a present `none` on a run that is not a baseline run or a present value other than `none` on a baseline run.
 
-The scorer reads identity from the attributes of the run's spans, the same place the grouping step reads `spanslo.run.id` (the attribute name is read from `spec/semconv-mapping.yaml`, never hardcoded; a span's `spanslo.run.id` when it is a non empty string, otherwise the span's trace ID). `run_id` in the run record is that grouping key. `experiment_id` is the value of `spanslo.experiment.id` and `task_id` is the value of `spanslo.task.id`; `task_id` is null when the attribute is absent. `framework` is the value of `spanslo.framework` and `model` is the value of `spanslo.model`, both written by the harness. A value counts as present only when it is a non empty string, as for `spanslo.run.id`. `ScoreRun` takes no identity parameter: all identity comes from the trace.
+The trace reader copies each resource's attributes onto every span of that resource; when a span has its own attribute with the same name, the span's value wins. The scorer then reads identity from the attributes of the run's spans, the same place the grouping step reads `spanslo.run.id` (the attribute name is read from `spec/semconv-mapping.yaml`, never hardcoded; a span's `spanslo.run.id` when it is a non empty string, otherwise the span's trace ID). `run_id` in the run record is that grouping key. `experiment_id` is the value of `spanslo.experiment.id` and `task_id` is the value of `spanslo.task.id`; `task_id` is null when the attribute is absent. `framework` is the value of `spanslo.framework` and `model` is the value of `spanslo.model`, both written by the harness. A value counts as present only when it is a non empty string, as for `spanslo.run.id`. `ScoreRun` takes no identity parameter: all identity comes from the trace.
 
 Benchmark hooks set the run identity directly. For external injectors, adapters first use trace context or baggage, then fall back to process, run id environment variable and time window. Week 1 must confirm which path each external injector supports.
 
@@ -164,7 +166,7 @@ Burst, intermittent and persistent modes fire more than one fault per run, so re
 - An episode is a sequence of triggered faults on the same target with no qualifying recovery between them. A new fault after a recovery starts a new episode.
 - Each episode records its first and last fault, fault count, whether it recovered, turns and time to recover, cascade spans and recovery tokens.
 - Under persistent mode the target never recovers, so only a declared fallback can end the episode with recovery.
-- For a fault whose surface is `model` (see the catalog), the target is the model call. A qualifying recovery is the next chat span after the fault turn that has no error status and is followed by no chat span with an error status. The persistent rule applies as for tools: under persistent mode no later chat span on the target qualifies, so a model surface episode can only recover through a declared fallback tool call.
+- For a fault whose surface is `model` (see the catalog), the target is the model call. A qualifying recovery is the next chat span after the fault turn that has no error status and is followed by no chat span with an error status. The persistent rule applies as for tools: under persistent mode no later chat span on the target qualifies, so a model surface episode can only recover through a declared fallback tool call. In every mode, a successful call to a declared fallback tool of the task after the fault also qualifies as recovery for a model surface fault, in addition to the next successful chat span; the persistent rule excludes only the target (the later chat spans), never the fallback.
 - A run counts as surface recovered only if all of its episodes recovered.
 
 ### Canonical fault event
@@ -230,7 +232,7 @@ The counts of a run are read from its spans as follows. `turns` and `model_calls
 
 ## SLI and SLO definitions
 
-Every SLI is computed only over runs where the fault actually fired, and always compared with no fault baseline runs of the same task, framework and model, so results are not inflated by faults that never triggered. Runs marked `fault_not_applied` are excluded.
+Every SLI is computed only over runs where the fault actually fired, and always compared with no fault baseline runs of the same task, framework and model, so results are not inflated by faults that never triggered. Runs marked `fault_not_applied` are excluded. Baselines (S0, and the medians behind TAF, turn amplification and resilience ratio) are built from every baseline run in the input dataset, before any window trims runs, and are keyed per run by task, framework and model. A window selects only the runs whose SLI is pooled; it never removes baseline runs from the baseline.
 
 | SLI | Id | Formula | Notes |
 | --- | --- | --- | --- |
@@ -295,7 +297,7 @@ windows:
 
 - **Error budget**, as a share of runs in the window, depends on the form of the SLO: `target` gives 1 minus target (resilience ratio has no error budget); `target_max` on a rate gives target\_max; `threshold_max` with `objective` gives 1 minus objective. In a window, allowed = error budget x number of runs (or episodes) in the window, bad = number of bad runs (or episodes), and remaining = allowed - bad. The budget is exhausted when bad is greater than allowed.
 - **Distribution SLIs** (turns to recover, time to recover, cascade spans, recovery tokens, TAF, turn amplification) have one value per episode or run, so they use the threshold form: at least `objective` of the values must be at or under `threshold_max`. The cost SLO above says at least 95 percent of runs have TAF of 2.0 or less. This replaces the v2.4 target on the p95 of TAF. p50 and p95 remain reporting statistics. An SLO in the `threshold_max` with `objective` form is met when the share of values at or under `threshold_max` is at least `objective`. For `turns_to_recover` and `time_to_recover`, an unrecovered episode counts as a value over `threshold_max` (a violation). For `cascade_spans` and `recovery_tokens`, an unrecovered episode is counted with its measured value.
-- **Windows.** The end time of a run is its `ended_at`. Offline, "now" is the latest `ended_at` among the input runs, and `core/` never reads the wall clock. A time window is the duration `budget` ending at "now": a run belongs to it when its `ended_at` falls inside. A count window is the last `budget` runs, ordered by `ended_at` ascending, with ties broken by `run_id`.
+- **Windows.** The end time of a run is its `ended_at`. Offline, "now" is the latest `ended_at` among the input runs, and `core/` never reads the wall clock. A time window is the duration `budget` ending at "now": a run belongs to it when its `ended_at` falls inside. A count window is the last `budget` runs, ordered by `ended_at` ascending, with ties broken by `run_id`. A window selects only the runs whose SLI is pooled; baselines are not windowed (see the SLI table intro).
 - **Burn windows** apply only to SLOs whose SLI is counted as a fraction of runs or episodes. Resilience ratio is a quotient of two rates, so its SLO uses the target form and sets `burn: false`. Baseline success (S0) has no SLO; its window is the baseline set, all baseline runs offline and a rolling set live.
 - **Burn rate** = observed bad fraction divided by the error budget. Time windows follow the Google SRE Workbook multiwindow pattern; count window factors are starting values to tune from the pilot. The bad fraction is: bad runs or episodes / runs or episodes in the window, where a bad run or episode is one that fails the SLI's good condition (for a threshold form, a value over `threshold_max`). For every configured pair of `long` and `short` windows, the burn rate is computed over the long window and over the short window and compared with `factor`. A burn-rate alert fires for a pair only when both burn rates are at or above `factor`.
 - **Zero error budget.** When an error budget is 0 (a `target` of 1.0, a `target_max` of 0, or an `objective` of 1), any failure is a breach. The burn rate is infinite (+Inf) when the bad fraction is above 0, and 0 when the bad fraction is 0. It is never NaN.
@@ -303,7 +305,7 @@ windows:
 
 ## Fault catalog
 
-Each fault is a YAML file that names the failure, how each source produces it, and the modes it can run in, so the same fault runs identically from benchmark hooks or an external injector. The contract a well behaved agent must meet is shared by all faults in catalog/defaults.yaml; a fault file may override single keys.
+Each fault is a YAML file that names the failure, how each source produces it, and the modes it can run in, so the same fault runs identically from benchmark hooks or an external injector. The contract a well behaved agent must meet is shared by all faults in catalog/defaults.yaml; a fault file may override single keys. The contract used to score a run is the default contract for a baseline run, and the effective contract of the run's fault id for a faulted run. A run whose faults carry more than one distinct `spanslo.fault.id` is invalid (see Invalid runs).
 
 ```yaml
 apiVersion: spanslo/v1
@@ -374,6 +376,7 @@ The scorer is a pure function from a completed run to a run record, wrapped by a
 - A run whose root span is missing or unfinished has no `ended_at` and is invalid.
 - A run with no `spanslo.mode` that is not a baseline run is invalid (see Run identity).
 - A run with a triggered fault on a span outside the index, or an untriggered fault whose `spanslo.fault.turn` is not an integer of at least 1, is invalid (see Step indexing). The reason names the span or `spanslo.fault.turn`.
+- A run whose fault events carry more than one distinct `spanslo.fault.id` is invalid. The reason names `spanslo.fault.id`.
 - A run whose present `spanslo.mode` is not one of `none`, `single`, `burst`, `intermittent` or `persistent`, or is `none` on a non baseline run, or is not `none` on a baseline run, is invalid. The reason names `spanslo.mode`.
 - A run whose `experiment_id`, `framework` or `model` is missing or empty is invalid. The reason names the attribute (`spanslo.experiment.id`, `spanslo.framework` or `spanslo.model`). `task_id` may be null and never makes a run invalid (see Run identity).
 - A run whose `ended_at` fails a real RFC 3339 parse is invalid (see Run record). Where run records are read back (`slo`, `report`, `gate`), an unparseable `ended_at` is not a per run problem: the command exits 2 (error rule above).
@@ -383,7 +386,7 @@ The scorer is a pure function from a completed run to a run record, wrapped by a
 
 - **Memory bounds:** maximum open runs and spans per run, with a dropped spans counter instead of unbounded growth.
 - **Cardinality:** metric labels limited to experiment, framework, model, fault and surface; task and run IDs stay in run records only.
-- **Baselines:** offline mode computes medians per task, framework and model from the dataset. Live mode keys its internal rolling baseline by task, framework and model whenever spanslo.task.id is present, without exporting task as a label. Untagged traffic exports raw token and turn counts only, and TAF is not computed for it, because even tokens per turn grow with task length as context accumulates. Metrics stay marked provisional until enough baseline runs exist. The live rolling baseline is the last `baseline_runs` baseline runs for the key (default 100), optionally also limited to those within `baseline_window`; when both are set, both limits apply.
+- **Baselines:** offline mode computes medians per task, framework and model from every baseline run in the input dataset, before any window trims runs. Live mode keys its internal rolling baseline by task, framework and model whenever spanslo.task.id is present, without exporting task as a label. Untagged traffic exports raw token and turn counts only, and TAF is not computed for it, because even tokens per turn grow with task length as context accumulates. Metrics stay marked provisional until enough baseline runs exist. The live rolling baseline is the last `baseline_runs` baseline runs for the key (default 100), optionally also limited to those within `baseline_window`; when both are set, both limits apply.
 
 ### Collector configuration
 

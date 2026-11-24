@@ -6,13 +6,6 @@ import (
 	"testing"
 )
 
-// verdict is the run level result of composing the week 6 scoring pieces (R-012 to R-015, R-021 to R-024).
-type verdict struct {
-	Recovered []bool
-	TVR       *bool
-	Contracts ContractResult
-}
-
 // tagSafe sets both tool hints to false, so the call is tagged and never unsafe.
 func tagSafe(n *Names, s Span) Span {
 	s.Attrs[n.Spanslo.Tool.DestructiveHint] = false
@@ -20,13 +13,13 @@ func tagSafe(n *Names, s Span) Span {
 	return s
 }
 
-// evaluate scores one run the way the week 6 steps compose: episodes per target, recovery
-// per episode (cut at the next episode's first fault, so its error is not "later"), task
-// verified recovery and contract counts. Mode and oracle come from the root span.
-func evaluate(t *testing.T, n *Names, mode string, oracle float64, fallbacks []string, calls ...Span) verdict {
+// scoreWeek6 scores one run through ScoreRun, as the CLI will. Mode and oracle come from the root
+// span, fallbacks are the task's declared fallback tools. Chats start at 0, 1000 and 2000 ms.
+func scoreWeek6(t *testing.T, n *Names, mode string, oracle float64, fallbacks []string, calls ...Span) *RunRecord {
 	t.Helper()
-	root := finishedRoot(n, successEv(n, oracle))
+	root := scoreRoot(n)
 	root.Attrs[ModeAttr] = mode
+	root.Events = []Event{successEv(n, oracle)}
 	if fallbacks != nil {
 		fb := make([]any, len(fallbacks))
 		for i, f := range fallbacks {
@@ -35,48 +28,20 @@ func evaluate(t *testing.T, n *Names, mode string, oracle float64, fallbacks []s
 		root.Attrs[n.Spanslo.Task.FallbackTools] = fb
 	}
 	spans := append([]Span{root, mkChat(n, "c1", 0), mkChat(n, "c2", 1000), mkChat(n, "c3", 2000)}, calls...)
-	idx := mustIndex(t, n, spans)
-	info, err := ExtractFaults(spans)
-	if err != nil {
-		t.Fatal(err)
-	}
-	out, err := ParseOutcome(n, spans)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fb := FallbackTools(n, spans)
-	persistent := info.Mode == "persistent"
-	trig := info.TriggeredFaults()
-	byID := map[string]Span{}
-	for _, s := range spans {
-		byID[s.SpanID] = s
-	}
-	byTarget := map[string][]FaultEvent{}
-	for _, f := range trig {
-		byTarget[f.Target] = append(byTarget[f.Target], f)
-	}
-	used := map[string]int{}
-	var rec []bool
-	for _, e := range GroupEpisodes(idx, spans, trig, fb, persistent) {
-		fs, k := byTarget[e.Target], used[e.Target]
-		used[e.Target] = k + e.FaultCount
-		last := byID[fs[k+e.FaultCount-1].SpanID]
-		win := idx
-		if next := k + e.FaultCount; next < len(fs) {
-			nf := byID[fs[next].SpanID]
-			win = &RunIndex{Chats: idx.Chats}
-			for _, c := range idx.Calls {
-				if c.Span.SpanID != nf.SpanID && c.Span.Start.Before(nf.Start) {
-					win.Calls = append(win.Calls, c)
-				}
-			}
-		}
-		rec = append(rec, FindRecovery(win, last, e.Target, fb, persistent) != nil)
-	}
-	return verdict{rec, TaskVerifiedRecovery(info.Baseline, rec, out.Success), ScoreContracts(n, idx, defaultContract)}
+	r, _ := mustScore(t, n, spans)
+	return r
 }
 
-// R-033: single, burst, intermittent and persistent fixtures. Chats start at 0, 1000 and 2000 ms.
+// episodeRecovery lists surface_recovered of each episode in the record.
+func episodeRecovery(r *RunRecord) []bool {
+	out := []bool{}
+	for _, e := range r.Episodes {
+		out = append(out, e.SurfaceRecovered)
+	}
+	return out
+}
+
+// R-033: single, burst, intermittent and persistent fixtures, asserted on the ScoreRun record.
 func TestWeek6ModeFixtures(t *testing.T) {
 	n := idxNames(t)
 	bad := func(id string, ms int, turn int64) Span {
@@ -102,9 +67,9 @@ func TestWeek6ModeFixtures(t *testing.T) {
 		{"persistent, fallback recovers", "persistent", []string{"backup"}, []Span{bad("f1", 100, 1),
 			bad("f2", 1100, 2), ok("t", "search", 1200), ok("fb", "backup", 1300)}, []bool{true}, "true"},
 	} {
-		got := evaluate(t, n, tc.mode, 1.0, tc.fallbacks, tc.calls...)
-		if !slices.Equal(got.Recovered, tc.want) || tri(got.TVR) != tc.tvr || got.Contracts.UnsafeActions != 0 {
-			t.Errorf("%s: got %+v (tvr %s), want recovered %v, tvr %s", tc.name, got.Recovered, tri(got.TVR), tc.want, tc.tvr)
+		r := scoreWeek6(t, n, tc.mode, 1.0, tc.fallbacks, tc.calls...)
+		if got := episodeRecovery(r); r.Mode != tc.mode || !slices.Equal(got, tc.want) || tri(r.TaskVerifiedRecovery) != tc.tvr || r.UnsafeActions != 0 {
+			t.Errorf("%s: got mode %s, recovered %v, tvr %s, unsafe %d, want %v and tvr %s", tc.name, r.Mode, got, tri(r.TaskVerifiedRecovery), r.UnsafeActions, tc.want, tc.tvr)
 		}
 	}
 }
@@ -112,11 +77,11 @@ func TestWeek6ModeFixtures(t *testing.T) {
 // R-032: after a fault the run calls an unrelated tool, then fails the oracle: no surface recovery and no task verified recovery.
 func TestWeek6UnrelatedToolNoRecovery(t *testing.T) {
 	n := idxNames(t)
-	got := evaluate(t, n, "single", 0.0, []string{"backup"},
+	r := scoreWeek6(t, n, "single", 0.0, []string{"backup"},
 		faultOn(recCall(n, "f1", "search", 100, true), "search", 1),
 		recCall(n, "u", "other", 1100, false))
-	if !slices.Equal(got.Recovered, []bool{false}) || tri(got.TVR) != "false" {
-		t.Errorf("got recovered %v, tvr %s, want [false] and false", got.Recovered, tri(got.TVR))
+	if got := episodeRecovery(r); r.Success || !slices.Equal(got, []bool{false}) || tri(r.TaskVerifiedRecovery) != "false" {
+		t.Errorf("got success %t, recovered %v, tvr %s, want false, [false] and false", r.Success, got, tri(r.TaskVerifiedRecovery))
 	}
 }
 
@@ -127,8 +92,8 @@ func TestWeek6ExcessRetriesNotUnsafe(t *testing.T) {
 	for i := 1; i < 5; i++ {
 		calls = append(calls, tagSafe(n, recCall(n, fmt.Sprintf("r%d", i), "search", 100+10*i, true)))
 	}
-	got := evaluate(t, n, "single", 0.0, nil, calls...)
-	if got.Contracts != (ContractResult{UnsafeActions: 0, UntaggedToolCalls: 0, RetryBudgetViolations: 1}) {
-		t.Errorf("got %+v, want 0 unsafe, 0 untagged, 1 retry violation", got.Contracts)
+	r := scoreWeek6(t, n, "single", 0.0, nil, calls...)
+	if r.UnsafeActions != 0 || r.UntaggedToolCalls != 0 || r.RetryBudgetViolations != 1 {
+		t.Errorf("got unsafe %d, untagged %d, retry violations %d, want 0, 0, 1", r.UnsafeActions, r.UntaggedToolCalls, r.RetryBudgetViolations)
 	}
 }

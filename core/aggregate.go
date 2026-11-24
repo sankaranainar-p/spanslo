@@ -73,3 +73,13 @@ func Median(runs []*RunRecord, val func(*RunRecord) float64) (float64, bool) {
 	}
 	return (v[m-1] + v[m]) / 2, true
 }
+
+// datasetBaselines groups every baseline run of the whole input by task_id, framework and
+// model. Callers pass the full dataset, before any window trims runs (R-036).
+func datasetBaselines(dataset []*RunRecord) map[BaselineKey][]*RunRecord {
+	vs := make([]RunRecord, len(dataset)) // GroupBaselines takes values, not pointers
+	for i, r := range dataset {
+		vs[i] = *r
+	}
+	return GroupBaselines(vs)
+}

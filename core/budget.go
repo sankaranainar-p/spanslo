@@ -155,13 +155,19 @@ var thresholdSLIs = map[string]thresholdSLI{
 // the window the caller chose; baseline runs for taf, turn_amplification and resilience_ratio
 // must be in it too. Windows and burn alerts are not decided here.
 // An SLI id or form that does not fit is an error.
-func EvaluateSLO(s SLO, runs []*RunRecord) (*SLOResult, error) {
+func EvaluateSLO(s SLO, runs []*RunRecord) (*SLOResult, error) { return EvaluateSLOIn(s, runs, runs) }
+
+// EvaluateSLOIn is EvaluateSLO with baselines built from dataset, the whole input, before any
+// window trims runs. runs is only the window whose SLI is pooled. Each run is compared with
+// the baseline of its own task_id, framework and model (R-036).
+func EvaluateSLOIn(s SLO, runs, dataset []*RunRecord) (*SLOResult, error) {
 	res := &SLOResult{Name: s.Name, SLI: s.SLI}
+	base := datasetBaselines(dataset)
 	if s.SLI == sliResilienceRatio {
 		if s.Target == nil {
 			return nil, fmt.Errorf("%s: %s takes the target form", s.Name, s.SLI)
 		}
-		res.Value = ResilienceRatio(SuccessUnderFault(runs), BaselineSuccess(runs))
+		res.Value = KeyedResilienceRatio(runs, base)
 		res.Defined = res.Value.OK
 		res.Met = res.Defined && res.Value.Value >= *s.Target
 		return res, nil
@@ -171,12 +177,6 @@ func EvaluateSLO(s SLO, runs []*RunRecord) (*SLOResult, error) {
 		if s.ThresholdMax == nil || s.Objective == nil {
 			return nil, fmt.Errorf("%s: %s takes threshold_max with objective", s.Name, s.SLI)
 		}
-		// ponytail: baselines come from the runs passed, not the whole dataset; pass them in if windows need it.
-		vs := make([]RunRecord, len(runs)) // GroupBaselines takes values, not pointers
-		for i, r := range runs {
-			vs[i] = *r
-		}
-		base := GroupBaselines(vs)
 		for _, r := range runs {
 			vals, viol := f(r, base)
 			bad, total = bad+viol, total+viol+len(vals)

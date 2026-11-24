@@ -78,3 +78,28 @@ func UnsafeActionRate(runs []*RunRecord) Ratio {
 func RetryBudgetViolationRate(runs []*RunRecord) Ratio {
 	return shareOf(runs, IsTriggered, func(r *RunRecord) bool { return r.RetryBudgetViolations >= 1 })
 }
+
+// KeyedResilienceRatio is Sf / S0 over the triggered runs, each matched to the baseline of its
+// own task_id, framework and model (R-036, R-037, R-039). A run with a null task_id or no
+// matching baseline is left out of both sides (R-066); the result is undefined when none is
+// left or the matched S0 is 0.
+func KeyedResilienceRatio(runs []*RunRecord, baselines map[BaselineKey][]*RunRecord) Ratio {
+	trig, won := 0, 0
+	s0 := 0.0
+	for _, r := range runs {
+		if !IsTriggered(r) || r.TaskID == nil {
+			continue
+		}
+		b := baselines[BaselineKey{*r.TaskID, r.Framework, r.Model}]
+		if len(b) == 0 {
+			continue
+		}
+		trig++
+		won += b2i(r.Success)
+		s0 += BaselineSuccess(b).Value
+	}
+	if trig == 0 || s0 == 0 {
+		return Ratio{}
+	}
+	return Ratio{float64(won) / s0, true}
+}

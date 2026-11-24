@@ -309,7 +309,7 @@ Allowed models: Claude
 Depends on: T-021, T-022
 Milestone: M7
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-024: Windows and burn rate alerts
 Satisfies: R-052, R-053
@@ -320,7 +320,7 @@ Allowed models: Claude
 Depends on: T-023
 Milestone: M7
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-025: Week 7 unit and property tests
 Satisfies: R-047, R-055
@@ -331,7 +331,7 @@ Allowed models: Claude, Gemini Flash
 Depends on: T-024
 Milestone: M7
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-026: Canonical fault event, bench adapter, passthrough
 Satisfies: R-056, R-057, R-058

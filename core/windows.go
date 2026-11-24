@@ -76,11 +76,17 @@ func CountWindow(runs []*RunRecord, n int) ([]*RunRecord, error) {
 // whether the alert fires: only when both are at or above factor (R-053). An SLO with no
 // burn (burn false, resilience_ratio) or an empty window has burn rate 0 and never fires.
 func CheckBurnAlert(s SLO, long, short []*RunRecord, factor float64) (fires bool, longRate, shortRate float64, err error) {
-	l, err := EvaluateSLO(s, long)
+	return CheckBurnAlertIn(s, long, short, long, factor)
+}
+
+// CheckBurnAlertIn is CheckBurnAlert with baselines built from dataset, the whole input, not
+// from the windows (R-036).
+func CheckBurnAlertIn(s SLO, long, short, dataset []*RunRecord, factor float64) (fires bool, longRate, shortRate float64, err error) {
+	l, err := EvaluateSLOIn(s, long, dataset)
 	if err != nil {
 		return false, 0, 0, err
 	}
-	sh, err := EvaluateSLO(s, short)
+	sh, err := EvaluateSLOIn(s, short, dataset)
 	if err != nil {
 		return false, 0, 0, err
 	}

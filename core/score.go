@@ -193,15 +193,9 @@ func scoreEpisodes(n *Names, idx *RunIndex, spans []Span, info *FaultInfo) ([]Ru
 		first, last := byID[fs[k].SpanID], byID[fs[end-1].SpanID]
 		win := idx
 		if end < len(fs) {
-			next := byID[fs[end].SpanID]
-			win = &RunIndex{Chats: idx.Chats}
-			for _, c := range idx.Calls {
-				if c.Span.SpanID != next.SpanID && c.Span.Start.Before(next.Start) {
-					win.Calls = append(win.Calls, c)
-				}
-			}
+			win = cutBefore(idx, byID[fs[end].SpanID])
 		}
-		rec := FindRecovery(win, last, e.Target, fb, persistent)
+		rec := FindRecoveryFor(win, last, fs[end-1].Surface, e.Target, fb, persistent)
 		m, w := ComputeEpisodeMetrics(n, idx, spans, e, first, last, rec)
 		warns = append(warns, w...)
 		recovered = append(recovered, rec != nil)

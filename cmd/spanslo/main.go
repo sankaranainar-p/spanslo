@@ -17,6 +17,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "slo" {
 		return slo(args[1:], stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "report" {
+		return report(args[1:], stdout, stderr)
+	}
 	fmt.Fprintln(stderr, usage)
 	return 2
 }

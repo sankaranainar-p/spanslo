@@ -1,0 +1,23 @@
+{
+  "run_id": "model-truncated-stream-run",
+  "experiment_id": "golden",
+  "task_id": "t1",
+  "framework": "fw",
+  "model": "m",
+  "baseline": false,
+  "mode": "single",
+  "success": true,
+  "ended_at": "2023-11-14T22:13:25Z",
+  "turns": 3,
+  "model_calls": 3,
+  "tool_calls": 0,
+  "tokens_total": 310,
+  "turn_mismatches": 0,
+  "unsafe_actions": 0,
+  "untagged_tool_calls": 0,
+  "retry_budget_violations": 0,
+  "fault_not_applied": false,
+  "task_verified_recovery": true,
+  "faults": [{"id": "model-truncated-stream", "turn": 1, "triggered": true}],
+  "episodes": [{"target": "gpt", "first_fault_turn": 1, "last_fault_turn": 1, "fault_count": 1, "surface_recovered": true, "turns_to_recover": 1, "time_to_recover_ms": 250, "cascade_spans": 2, "recovery_tokens": 260}]
+}

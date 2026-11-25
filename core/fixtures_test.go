@@ -35,7 +35,7 @@ func TestIndexFixtures(t *testing.T) {
 			if order == "reversed" {
 				slices.Reverse(spans)
 			}
-			runs := GroupRuns(spans)
+			runs := GroupRuns(n, spans)
 			if len(runs) != 1 {
 				t.Fatalf("%s: got %d runs, want 1", tc.file, len(runs))
 			}

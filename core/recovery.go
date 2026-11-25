@@ -68,3 +68,63 @@ func FindRecovery(idx *RunIndex, fault Span, target string, fallbacks []string, 
 func AllRecovered(episodes []bool) bool {
 	return !slices.Contains(episodes, false)
 }
+
+// FindRecoveryFor is the recovery search of an episode; it dispatches on the fault surface
+// (R-012). For a model surface fault the qualifying call is the next chat span after the
+// fault turn with no error status and no later chat span with an error status, or the
+// successful call to a declared fallback tool that qualifies under FindRecovery, whichever
+// starts first. The fault turn is the derived turn of the span carrying the fault, a chat
+// span or a tool call span. Under persistent mode no chat span qualifies (R-013), so only a
+// declared fallback tool can recover, as for tools. Every other surface uses the tool
+// search, FindRecovery.
+func FindRecoveryFor(idx *RunIndex, fault Span, surface, target string, fallbacks []string, persistent bool) *Call {
+	if surface != "model" {
+		return FindRecovery(idx, fault, target, fallbacks, persistent)
+	}
+	// persistent is set here so a call to the model target never qualifies, only a fallback (R-012)
+	fb := FindRecovery(idx, fault, target, fallbacks, true)
+	if persistent {
+		return fb
+	}
+	if ch := nextChatRecovery(idx, fault, target); ch != nil && (fb == nil || spanCmp(ch.Span, fb.Span) <= 0) {
+		return ch
+	}
+	return fb
+}
+
+// nextChatRecovery is the next chat span after the fault turn with no error status and no
+// later chat span with an error status, or nil.
+func nextChatRecovery(idx *RunIndex, fault Span, target string) *Call {
+	t, ok := spanTurn(idx, fault)
+	if !ok || t >= len(idx.Chats) {
+		return nil
+	}
+	later := idx.Chats[t:]
+	last := -1
+	for i, c := range later {
+		if c.Status.Code == StatusError {
+			last = i
+		}
+	}
+	if last+1 >= len(later) {
+		return nil
+	}
+	return &Call{Span: later[last+1], Tool: target, T: t + last + 2}
+}
+
+// cutBefore keeps the chat and tool call spans that start before next, so next's own error
+// is not a "later error". Chats stay a prefix, so turn numbers do not change.
+func cutBefore(idx *RunIndex, next Span) *RunIndex {
+	w := &RunIndex{}
+	for _, c := range idx.Chats {
+		if c.Start.Before(next.Start) {
+			w.Chats = append(w.Chats, c)
+		}
+	}
+	for _, c := range idx.Calls {
+		if c.Span.SpanID != next.SpanID && c.Span.Start.Before(next.Start) {
+			w.Calls = append(w.Calls, c)
+		}
+	}
+	return w
+}

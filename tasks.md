@@ -386,7 +386,7 @@ Allowed models: Claude
 Depends on: T-016, T-026, T-045
 Milestone: M8
 Verify: go test ./cmd/...
-Status: open
+Status: done
 
 ## T-028: Run records validate against the schema
 Satisfies: R-031
@@ -397,7 +397,7 @@ Allowed models: Claude
 Depends on: T-017, T-027
 Milestone: M8
 Verify: uv run --project bench pytest bench/tests/test_run_records.py
-Status: open
+Status: done
 
 ## T-029: spanslo slo command
 Satisfies: R-061
@@ -408,7 +408,7 @@ Allowed models: Claude
 Depends on: T-024, T-027
 Milestone: M8
 Verify: go test ./cmd/...
-Status: open
+Status: done
 
 ## T-030: spanslo report command
 Satisfies: R-062
@@ -419,7 +419,7 @@ Allowed models: Claude
 Depends on: T-029
 Milestone: M8
 Verify: go test ./cmd/...
-Status: open
+Status: done
 
 ## T-031: spanslo gate command
 Satisfies: R-063
@@ -430,7 +430,7 @@ Allowed models: Claude
 Depends on: T-029
 Milestone: M8
 Verify: go test ./cmd/...
-Status: open
+Status: done
 
 ## T-032: Exit code audit across commands
 Satisfies: R-068
@@ -441,7 +441,7 @@ Allowed models: Claude, Gemini Flash
 Depends on: T-031
 Milestone: M8
 Verify: go test ./cmd/...
-Status: open
+Status: done
 
 ## T-033: Golden traces, model faults
 Satisfies: R-064
@@ -452,7 +452,7 @@ Allowed models: Claude
 Depends on: T-027
 Milestone: M8
 Verify: go test ./...
-Status: open
+Status: done
 
 ## T-034: Golden traces, tool faults and memory fault
 Satisfies: R-064
@@ -463,7 +463,7 @@ Allowed models: Claude
 Depends on: T-027
 Milestone: M8
 Verify: go test ./...
-Status: open
+Status: done
 
 ## T-035: Week 8 validation checks
 Satisfies: R-065
@@ -474,7 +474,7 @@ Allowed models: Claude, Gemini Flash
 Depends on: T-033, T-034
 Milestone: M8
 Verify: go test ./...
-Status: open
+Status: done
 
 ## T-036: Run identity matching for external injectors
 Satisfies: R-059

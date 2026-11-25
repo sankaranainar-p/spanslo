@@ -342,7 +342,7 @@ Allowed models: Claude
 Depends on: T-003
 Milestone: M8
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-045: Resource attributes onto spans
 Satisfies: R-001, R-078
@@ -353,7 +353,7 @@ Allowed models: Claude
 Depends on: T-044
 Milestone: M8
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-046: Fallback recovery for model surface faults
 Satisfies: R-012
@@ -364,7 +364,7 @@ Allowed models: Claude
 Depends on: T-045
 Milestone: M8
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-047: Baselines from the whole dataset before windows
 Satisfies: R-036, R-052
@@ -375,12 +375,12 @@ Allowed models: Claude
 Depends on: T-046
 Milestone: M8
 Verify: go test ./core/...
-Status: open
+Status: done
 
 ## T-027: spanslo score command
 Satisfies: R-060, R-016, R-018, R-025
-Inputs: T-016, T-026, T-045, design.md v2.15 (contract for a run: the default contract for a baseline run, the effective contract of the fault id for a faulted run; a run whose faults carry more than one distinct fault id is invalid)
-Outputs: cmd/spanslo score: reads traces, runs adapters, writes JSON lines, deletes the old sidecar first, writes <out>.invalid.jsonl (run_id, reason), prints each run status and names invalid runs, prints core warnings to stderr; exits 0 with invalid runs, 2 with no sidecar on unreadable input or usage error
+Inputs: T-016, T-026, T-045, design.md v2.15 (contract for a run: the default contract for a baseline run, the effective contract of the fault id for a faulted run; a run whose faults carry more than one distinct fault id is invalid); cmd/spanslo/main.go, cmd/spanslo/*.go, go.mod (the module path is github.com/sankaranainar-p/spanslo; import core as github.com/sankaranainar-p/spanslo/core)
+Outputs: cmd/spanslo/main.go (currently a stub that prints "spanslo dev"; replace it with the command dispatch) and cmd/spanslo score: reads traces, runs adapters, writes JSON lines, deletes the old sidecar first, writes <out>.invalid.jsonl (run_id, reason), prints each run status and names invalid runs, prints core warnings to stderr; exits 0 with invalid runs, 2 with no sidecar on unreadable input or usage error
 Done when: tests show a mixed input exits 0 with a sidecar naming the invalid run, a stale sidecar is replaced, and unparseable input exits 2 and leaves no sidecar; a baseline run is scored with the default contract, a faulted run with the effective contract of its fault id, and a run whose faults carry two distinct spanslo.fault.id values is invalid with a reason naming spanslo.fault.id
 Allowed models: Claude
 Depends on: T-016, T-026, T-045
@@ -401,7 +401,7 @@ Status: open
 
 ## T-029: spanslo slo command
 Satisfies: R-061
-Inputs: T-024, T-022
+Inputs: T-024, T-022; cmd/spanslo/main.go, cmd/spanslo/*.go, go.mod (the module path is github.com/sankaranainar-p/spanslo; import core as github.com/sankaranainar-p/spanslo/core)
 Outputs: cmd/spanslo slo: reads JSON lines runs and the SLO file, prints met or not, budget remaining and each burn alert
 Done when: a test prints the expected lines for a met SLO, a breached SLO and a firing alert, and exits 0 for all
 Allowed models: Claude
@@ -412,7 +412,7 @@ Status: open
 
 ## T-030: spanslo report command
 Satisfies: R-062
-Inputs: T-021, T-024
+Inputs: T-021, T-024; cmd/spanslo/main.go, cmd/spanslo/*.go, go.mod (the module path is github.com/sankaranainar-p/spanslo; import core as github.com/sankaranainar-p/spanslo/core)
 Outputs: cmd/spanslo report writing spanslo's own JSON: SLI values, percentiles with unrecovered counts, SLO results
 Done when: a test compares the report on a fixture with a hand checked expected JSON and exits 0 when SLOs are breached
 Allowed models: Claude
@@ -423,7 +423,7 @@ Status: open
 
 ## T-031: spanslo gate command
 Satisfies: R-063
-Inputs: T-029, T-027 sidecar
+Inputs: T-029, T-027 sidecar; cmd/spanslo/main.go, cmd/spanslo/*.go, go.mod (the module path is github.com/sankaranainar-p/spanslo; import core as github.com/sankaranainar-p/spanslo/core)
 Outputs: cmd/spanslo gate: checks the sidecar first (missing or non empty gives exit 2), then exits 1 on an unmet SLO or firing alert, else 0
 Done when: tests show exit 2 for a missing sidecar and a non empty sidecar, exit 1 for a breaching fixture, exit 0 for a clean fixture, and exit 2 for empty input
 Allowed models: Claude
@@ -434,7 +434,7 @@ Status: open
 
 ## T-032: Exit code audit across commands
 Satisfies: R-068
-Inputs: T-027, T-029 to T-031
+Inputs: T-027, T-029 to T-031; cmd/spanslo/main.go, cmd/spanslo/*.go, go.mod (the module path is github.com/sankaranainar-p/spanslo; import core as github.com/sankaranainar-p/spanslo/core)
 Outputs: table test for every command: unknown flag, missing file, unparseable runs or SLO file and unparseable ended_at all exit 2; slo and report exit 0 on breach
 Done when: the table test passes for score, slo, report and gate
 Allowed models: Claude, Gemini Flash

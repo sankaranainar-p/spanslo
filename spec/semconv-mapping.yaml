@@ -3,7 +3,7 @@
 # Every name below was checked against the pinned commit's model/gen-ai/*.yaml
 # (see bench/tests/test_spec_schemas.py, SPANSLO_NETWORK_TESTS=1).
 
-mapping_version: 8
+mapping_version: 9
 
 semconv:
   repo: https://github.com/open-telemetry/semantic-conventions-genai
@@ -77,6 +77,7 @@ spanslo_attributes:
     framework: spanslo.framework     # written by the harness; missing or empty makes the run invalid (added in mapping_version 8)
     model: spanslo.model             # written by the harness; missing or empty makes the run invalid (added in mapping_version 8)
   fault_event:
+    name: spanslo.fault               # the event name; core.FaultEventName must equal it (added in mapping_version 9)
     id: spanslo.fault.id
     surface: spanslo.fault.surface
     target: spanslo.fault.target

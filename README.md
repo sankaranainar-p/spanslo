@@ -3,6 +3,7 @@
 [![ci](https://github.com/sankaranainar-p/spanslo/actions/workflows/ci.yml/badge.svg)](https://github.com/sankaranainar-p/spanslo/actions/workflows/ci.yml)
 ![Go 1.27](https://img.shields.io/badge/go-1.27-00ADD8)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24552336.svg)](https://doi.org/10.5281/zenodo.24552336)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 spanslo scores how well AI agents survive injected faults, using standard OpenTelemetry traces. It computes SLIs, SLOs and error budgets from `gen_ai.*` spans, independently of any one fault injector, and publishes a benchmark of real recovery behavior.

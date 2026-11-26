@@ -32,9 +32,27 @@ It measures. It does not inject faults into other people's systems, and it does 
 
 The GenAI semantic conventions are pinned to a commit in `spec/semconv-mapping.yaml`. See `docs/adr/0002-semconv-pin.md`.
 
+## Install
+
+Download a binary and `SHA256SUMS.txt` from the [Releases](https://github.com/sankaranainar-p/spanslo/releases) page, then verify and run:
+
+```
+shasum -a 256 spanslo_<version>_<os>_<arch>      # compare with SHA256SUMS.txt
+chmod +x spanslo_<version>_<os>_<arch>
+./spanslo_<version>_<os>_<arch> score -h
+```
+
+The binaries are not signed. On macOS, Gatekeeper kills an unsigned download. Clear the flag first:
+
+```
+xattr -d com.apple.quarantine spanslo_<version>_darwin_arm64
+```
+
+Or build from source with Go 1.27, as in the Quickstart.
+
 ## Quickstart
 
-Build the CLI:
+Build the CLI from source (or use a release binary, see Install, and replace `./spanslo` below with its name):
 
 ```
 go build -o spanslo ./cmd/spanslo

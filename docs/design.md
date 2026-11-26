@@ -1,6 +1,6 @@
 # spanslo: Architecture and Implementation Plan
 
-Author: Sankaranainar Parmasivan · Design version v2.15 · November 24, 2026
+Author: Sankaranainar Parmasivan · Design version v2.16 · November 25, 2026
 
 ## Summary and decisions
 
@@ -35,6 +35,8 @@ It does not build a general purpose fault injector or a new SLO specification. B
 **Revision v2.14** (faults with no derived turn): a triggered fault on a span outside the index makes the run invalid, naming the span; the turn of an untriggered fault is the integer value of `spanslo.fault.turn`, which must be an integer of at least 1, otherwise the run is invalid, naming `spanslo.fault.turn` (Step indexing, Invalid runs).
 
 **Revision v2.15** (decisions from the week 7 gap report): resource attributes are copied onto every span of their resource when traces are parsed, and a span's own attribute wins on a name clash (Run identity); for a model surface fault in any mode, a successful call to a declared fallback tool also qualifies as recovery, in addition to the next successful chat span (Fault episodes); baselines for TAF, resilience ratio and the other baseline keyed SLIs are built from every baseline run in the input dataset before any window trims runs, and the window selects only the runs whose SLI is pooled (SLI and SLO definitions, Safeguards); the contract for a run is the default contract for a baseline run and the effective contract of the fault id for a faulted run, and a run whose faults carry more than one distinct fault id is invalid, naming `spanslo.fault.id` (Fault catalog, Invalid runs).
+
+**Revision v2.16** (golden traces through the CLI): the canonical fault event is named `spanslo.fault` (Canonical fault event).
 
 **Decisions for you to confirm:**
 
@@ -171,7 +173,7 @@ Burst, intermittent and persistent modes fire more than one fault per run, so re
 
 ### Canonical fault event
 
-Adapters convert each source's output into one span event with these attributes:
+Adapters convert each source's output into one span event named `spanslo.fault` with these attributes:
 
 | Attribute | Example | Meaning |
 | --- | --- | --- |

@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -45,7 +44,6 @@ func goldenSubset(t *testing.T, path string, want, got any) {
 }
 
 // R-064: one golden trace per model-* fault scores to its hand written expected record.
-// The trace files name the fault event as FAULT_EVENT; the test swaps in FaultEventName.
 func TestGoldenModelFaults(t *testing.T) {
 	n := idxNames(t)
 	for _, f := range []string{"model-malformed-tool-args", "model-rate-limit-429", "model-server-error-5xx", "model-timeout", "model-truncated-stream"} {
@@ -56,7 +54,7 @@ func TestGoldenModelFaults(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		spans, err := ParseOTLP(bytes.ReplaceAll(raw, []byte("FAULT_EVENT"), []byte(FaultEventName)))
+		spans, err := ParseOTLP(raw)
 		if err != nil {
 			t.Fatalf("%s: %v", f, err)
 		}

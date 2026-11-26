@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"testing"
@@ -9,7 +8,7 @@ import (
 
 // R-064: one golden trace for each tool-* fault and for memory-irrelevant-retrieval. The expected
 // records are written by hand from the timeline below, not from scorer output, and list the fields
-// that were checked (goldenSubset). The trace files name the fault event FAULT_EVENT.
+// that were checked (goldenSubset).
 //
 // Shared timeline, in ms after 1700000000 s (2023-11-14T22:13:20Z). Root 0 to 10000, so ended_at is
 // 22:13:30Z. Chats start at 100 (150 tokens), 2000 (180) and 4000 (120): turns 3, tokens_total 450.
@@ -39,7 +38,7 @@ func TestGoldenToolMemoryFaults(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		spans, err := ParseOTLP(bytes.ReplaceAll(raw, []byte("FAULT_EVENT"), []byte(FaultEventName)))
+		spans, err := ParseOTLP(raw)
 		if err != nil {
 			t.Fatalf("%s: %v", f, err)
 		}

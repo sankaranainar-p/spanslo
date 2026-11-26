@@ -9,7 +9,7 @@ spanslo scores how well AI agents survive injected faults, using standard OpenTe
 
 It measures. It does not inject faults into other people's systems, and it does not govern agents.
 
-**Status: pre release.** The scoring core is landing in stages toward `v0.2.0`. The spec is frozen at tag `v0.1.1-spec`. There is no stable CLI yet.
+**Status: v0.2.0, first scoring release.** The Go core and the offline CLI (`score`, `slo`, `report`, `gate`) work end to end on recorded OTLP JSON traces. The spec is frozen at tag `v0.1.1-spec`. Output formats can still change before 1.0. There are no benchmark results yet.
 
 ## What it does
 
@@ -32,6 +32,31 @@ It measures. It does not inject faults into other people's systems, and it does 
 
 The GenAI semantic conventions are pinned to a commit in `spec/semconv-mapping.yaml`. See `docs/adr/0002-semconv-pin.md`.
 
+## Quickstart
+
+Build the CLI:
+
+```
+go build -o spanslo ./cmd/spanslo
+```
+
+Score one recorded trace, then check it against an example SLO file:
+
+```
+./spanslo score -traces testdata/traces/tool-timeout-30s.json -catalog catalog -out runs.jsonl
+./spanslo report -runs runs.jsonl -out report.json -slo spec/examples/slo/valid/design-example.yaml
+./spanslo slo -runs runs.jsonl -slo spec/examples/slo/valid/design-example.yaml
+./spanslo gate -runs runs.jsonl -slo spec/examples/slo/valid/design-example.yaml; echo $?
+```
+
+- `score` writes one run record per run. Invalid runs go to `runs.jsonl.invalid.jsonl`.
+- `report` writes spanslo's own JSON: SLIs, percentiles and SLO results.
+- `gate` exits 1 when an SLO is breached or a burn alert fires. Exit 2 is bad input.
+- Several trace files: run `score` once per file, then concatenate the outputs and their sidecars.
+- Flags and exit codes: [cmd/spanslo/README.md](cmd/spanslo/README.md).
+
+The fixtures in `testdata/traces/` all contain injected faults. One fixture alone passes the example SLOs. All twelve scored together breach `task_recovery` and `safety`, so `gate` exits 1. That is expected. These SLIs are not benchmark results.
+
 ## Build and test
 
 ```
@@ -42,11 +67,13 @@ Needs Go 1.27 and [uv](https://docs.astral.sh/uv/) with Python 3.12.
 
 ## Limits
 
-- Pre release. Interfaces and output formats can change before `v0.2.0`.
+- Interfaces and output formats can change before 1.0.
+- `report` pools all runs. It does not group by experiment, framework, model or fault yet. `baseline_success` and `resilience_ratio` are null unless the data has baseline runs.
+- Duplicate JSON object keys keep the last value. RFC 8785 says to reject them.
 - Output is spanslo's own JSON. Other report formats come later.
 - Runs are read from JSON lines. Parquet is deferred.
 - The semantic conventions are in development upstream. The pin makes results reproducible, but it will need re-checking at each gate.
-- Adapters for external fault injectors need real captured fixtures. They are not built yet.
+- Adapters for external fault injectors need real captured fixtures. They are not built yet (tasks T-036 to T-039).
 - Benchmark results do not exist yet. Do not read any number in this repo as a published result.
 
 ## Non-goals

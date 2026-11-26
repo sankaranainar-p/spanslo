@@ -14,4 +14,6 @@ keywords:
   - reliability
   - slo
   - benchmark
-# Add version, date-released and doi when v0.2.0 is tagged and archived.
+version: 0.2.0
+date-released: 2026-11-26
+# Add doi once the release is archived on Zenodo.

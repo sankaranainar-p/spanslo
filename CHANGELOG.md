@@ -4,6 +4,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-26
+
+First scoring release. Not a benchmark release.
+
 ### Added
 - Names mapping read from the pinned semantic convention file, with a test that forbids hardcoded `gen_ai.*` literals.
 - RFC 8785 canonical JSON and argument hashing in the core.
@@ -12,8 +16,17 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 - Trace fixtures for indexing edge cases, and a purity check for the core.
 - Hand written Go run record types with a schema drift test (ADR 0004).
 
+- Fault episodes, recovery rules, SLIs, percentiles, SLO evaluation and burn rate alerts.
+- Offline CLI: `score`, `slo`, `report`, `gate`, with documented exit codes.
+- Twelve golden trace fixtures scored through the real CLI.
+- Tag triggered release workflow: five binaries and `SHA256SUMS.txt`, published as a pre-release.
+- Semantic convention mapping version 9: names the fault event `spanslo.fault`.
+
 ### Known limits
-- Duplicate JSON object keys keep the last value. RFC 8785 says to reject them.
+- Duplicate JSON object keys keep the last value. RFC 8785 says to reject them (open question OQ-1).
+- `report` pools all runs. No grouping by experiment, framework, model or fault (R-034, R-037).
+- Adapters for external fault injectors are blocked until real fixtures are captured (T-036 to T-039).
+- The fault event name is also a constant in core. A test checks it equals the mapping (OQ-2).
 
 ## [0.1.1-spec]
 

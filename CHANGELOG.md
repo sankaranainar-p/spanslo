@@ -4,6 +4,12 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added
+- `report` has `groups` (per experiment, framework, model and fault) and `baselines` (per task, framework and model).
+
+### Changed
+- Report percentile keys are snake case (`turns_to_recover`, `p50`, `p95`, `unrecovered`). Undefined values are `null`. Before, they were Go field names, with an `OK` flag.
+
 ## [0.2.0] - 2026-11-26
 
 First scoring release. Not a benchmark release.

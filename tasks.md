@@ -515,3 +515,47 @@ Allowed models: Claude
 Depends on: T-026
 Milestone: M8
 Status: blocked
+
+## T-048: Group and baseline rows for the report
+Satisfies: R-082, R-083
+Inputs: core/aggregate.go, core/sli.go, core/percentiles.go, core/score.go, design.md v2.17 "CLI" (report bullet)
+Outputs: core/report.go with pure functions ReportGroups(runs, baselines) and ReportBaselines(baselines) returning typed rows sorted as R-082 and R-083 say; no I/O, no clock
+Done when: tests cover two experiments, two frameworks, two models and two faults; a run with two triggered fault ids appears in both groups; a group with no matching baseline has resilience_ratio undefined; baseline rows hold runs, baseline_success and the two medians; null task_id baselines are left out; rows are sorted
+Allowed models: Claude
+Depends on: T-047
+Milestone: V021
+Verify: go test ./core/...
+Status: open
+
+## T-049: Percentile keys in snake case
+Satisfies: R-085
+Inputs: core/percentiles.go, core/percentiles_test.go, cmd/spanslo/report.go, design.md v2.17 "CLI" (report bullet)
+Outputs: the percentile types marshal to JSON as turns_to_recover, time_to_recover, cascade_spans, recovery_tokens, taf and turn_amplification, each with p50, p95 and unrecovered; p50 and p95 are null when undefined; no ok key
+Done when: a test marshals a percentile set with defined and undefined values and checks the exact JSON keys and the nulls; existing percentile tests still pass
+Allowed models: Claude
+Depends on: T-047
+Milestone: V021
+Verify: go test ./...
+Status: open
+
+## T-050: Report command writes groups and baselines
+Satisfies: R-062, R-082, R-083, R-084, R-085
+Inputs: cmd/spanslo/report.go, cmd/spanslo/main.go, cmd/spanslo/README.md, core/report.go, core/percentiles.go, go.mod, design.md v2.17 "CLI" (report bullet)
+Outputs: spanslo report writes top level slis, percentiles, slos (unchanged meaning), plus groups and baselines; cmd/spanslo/README.md describes the new keys
+Done when: a CLI test on run records with baselines and faulted runs checks groups, baselines, the pooled top level and that undefined values are null; exit codes are unchanged
+Allowed models: Claude
+Depends on: T-048, T-049
+Milestone: V021
+Verify: go test ./...
+Status: open
+
+## T-051: End to end report check
+Satisfies: R-086
+Inputs: cmd/spanslo/golden_test.go, testdata/traces/model-timeout.json, testdata/traces/model-timeout.expected.json, cmd/spanslo/main.go, cmd/spanslo/report.go, go.mod
+Outputs: fixtures under testdata/report/: two baseline traces (one success, one fail) and faulted traces of the same task, framework and model, plus a trace that triggers two fault ids; cmd/spanslo/report_e2e_test.go that runs score on each, joins the outputs and their sidecars, runs report, and checks the JSON
+Done when: the test checks groups, baselines, a resilience_ratio that equals a value computed by hand in a comment, the second fault id appearing in two groups, and no null where the data defines a value; it runs through the real run function, not core helpers
+Allowed models: Claude
+Depends on: T-050
+Milestone: V021
+Verify: go test ./...
+Status: open

@@ -1,6 +1,6 @@
 # spanslo: Architecture and Implementation Plan
 
-Author: Sankaranainar Parmasivan · Design version v2.16 · November 25, 2026
+Author: Sankaranainar Parmasivan · Design version v2.17 · November 27, 2026
 
 ## Summary and decisions
 
@@ -37,6 +37,8 @@ It does not build a general purpose fault injector or a new SLO specification. B
 **Revision v2.15** (decisions from the week 7 gap report): resource attributes are copied onto every span of their resource when traces are parsed, and a span's own attribute wins on a name clash (Run identity); for a model surface fault in any mode, a successful call to a declared fallback tool also qualifies as recovery, in addition to the next successful chat span (Fault episodes); baselines for TAF, resilience ratio and the other baseline keyed SLIs are built from every baseline run in the input dataset before any window trims runs, and the window selects only the runs whose SLI is pooled (SLI and SLO definitions, Safeguards); the contract for a run is the default contract for a baseline run and the effective contract of the fault id for a faulted run, and a run whose faults carry more than one distinct fault id is invalid, naming `spanslo.fault.id` (Fault catalog, Invalid runs).
 
 **Revision v2.16** (golden traces through the CLI): the canonical fault event is named `spanslo.fault` (Canonical fault event).
+
+**Revision v2.17** (grouped report): `spanslo report` also writes `groups` (per experiment, framework, model and fault) and `baselines` (per task, framework and model), and its percentile keys are snake case with null for undefined values (CLI).
 
 **Decisions for you to confirm:**
 
@@ -453,7 +455,7 @@ spanslo gate   --runs runs.jsonl --slo slo.yaml   # exit 1 on breach, for CI
 
 - `score` reads raw recorded traces, runs the adapters, scores every run and writes the run records to `--out` as JSON lines, one record per line. The raw traces are not rewritten. Parquet output waits for a dependency decision. It prints the status of each run and names each invalid run. Sidecar and exit codes follow the error rule in Invalid runs. At the start it deletes any existing `<out>.invalid.jsonl`; it writes a new one whenever it processed input (empty when no run is invalid) and none when it exits 2.
 - `slo` evaluates every SLO in the SLO file over the run records and prints, for each SLO, whether it is met, the budget remaining and each burn-rate alert that fires. `--runs` is a JSON lines file of run records.
-- `report` writes spanslo's own JSON report: the SLI values with their percentiles and unrecovered counts, and the result of each SLO as in `slo`. The agent-sre shape is not produced in weeks 5 to 8; it arrives in week 10.
+- `report` writes spanslo's own JSON report. The top level `slis` and `percentiles` are pooled over all runs, and `baseline_success` there is pooled over all baseline runs. With `--slo` it adds the result of each SLO as in `slo`. It also has `groups` and `baselines`. `groups` has one entry per experiment, framework, model and fault id, built from triggered runs and sorted by those four strings: the keys, `triggered_runs`, the SLIs `success_under_fault`, `resilience_ratio`, `surface_recovery_rate`, `task_verified_recovery_rate`, `unsafe_action_rate` and `retry_budget_violation_rate`, and the percentiles. Each run is compared with the baseline of its own task, framework and model from the whole dataset. A run with two triggered fault ids is in two groups. `baselines` has one entry per task, framework and model that has baseline runs, sorted by those three strings: the keys, `runs`, `baseline_success`, `median_tokens_total` and `median_turns`. An undefined value is `null`, never 0. Percentiles are `{p50, p95, unrecovered}` under the keys `turns_to_recover`, `time_to_recover`, `cascade_spans`, `recovery_tokens`, `taf` and `turn_amplification`. The agent-sre shape arrives in week 10.
 - `gate` evaluates the SLOs as `slo` does and exits 1 when any SLO is not met or any burn-rate alert fires. Before it evaluates anything, it exits 2 when the sidecar `<runs file>.invalid.jsonl` is missing or non empty. For the resilience SLO it compares `resilience_ratio` with its target only.
 - Exit codes for every command: 0 when the command succeeded; 1 only from `gate`, when an SLO is not met or a burn-rate alert fires; 2 for usage errors and for bad input to the whole command (missing or unreadable file, unparseable traces, run records or SLO file, unknown flag, a run record with an unparseable `ended_at`); a problem with one run is not an exit 2 for `score` (see Invalid runs). `slo` and `report` exit 0 when SLOs are breached. `gate` on empty or unparseable input exits 2, never 0, and `gate` exits 2 when the invalid run sidecar is missing or non empty.
 

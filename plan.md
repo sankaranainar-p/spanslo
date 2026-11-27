@@ -1,6 +1,6 @@
 # Plan: spanslo scoring core and CLI (weeks 5 to 8, gate G2)
 
-Steps are ordered. Each step cites the R-IDs in spec.md (version 0.14, written against docs/design.md v2.15) it satisfies. YAML parser for Go: `go.yaml.in/yaml/v3`. It is needed from week 5 (step 1 reads `spec/semconv-mapping.yaml`). The human adds it by hand, and records its name, version and license in `docs/dependencies.md`, before the first factory run. Do not add it from a factory run. The "Done when" items (R-009, R-032, R-033, R-047, R-055, R-064, R-065) are validation checks, not build work: they appear only on each week's validation line. A week is done only when its validation passes; a failed check repeats the week (docs/design.md, Weekly execution plan).
+Steps are ordered. Each step cites the R-IDs in spec.md (version 0.16, written against docs/design.md v2.17) it satisfies. YAML parser for Go: `go.yaml.in/yaml/v3`. It is needed from week 5 (step 1 reads `spec/semconv-mapping.yaml`). The human adds it by hand, and records its name, version and license in `docs/dependencies.md`, before the first factory run. Do not add it from a factory run. The "Done when" items (R-009, R-032, R-033, R-047, R-055, R-064, R-065) are validation checks, not build work: they appear only on each week's validation line. A week is done only when its validation passes; a failed check repeats the week (docs/design.md, Weekly execution plan).
 
 ## Architecture
 One Go core, two thin wrappers. Layout from docs/design.md, Repository layout:
@@ -61,6 +61,14 @@ Validation: R-047 and R-055, unit and property tests pass.
 Validation: R-064 and R-065, golden trace tests pass and `spanslo gate` exits 1 on a breaching fixture.
 
 Publish step for week 8 is "Release v0.2.0 with CLI binaries (G2)". It is not part of these tasks; the human tags and releases.
+
+### v0.2.1: grouped report (R-082 to R-086)
+1. Pure builders in `core/` for the `groups` and `baselines` entries, using `GroupTriggered`, `GroupBaselines`, `Median` and the dataset baselines (R-082, R-083).
+2. Snake case percentile keys with null for undefined values (R-085).
+3. `spanslo report` writes `groups` and `baselines` and keeps the pooled top level (R-084), then update `cmd/spanslo/README.md`.
+4. End to end check through the real CLI on fixtures under `testdata/report/` (R-086).
+
+Validation: R-086. The human tags and releases `v0.2.1`.
 
 ## Tech choices
 | Choice | Option picked | Why |
